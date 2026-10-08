@@ -25,6 +25,7 @@ export const SettingsSchema = z.object({
   teams: z.array(z.object({ league: z.enum(LEAGUES), id: z.string().min(1) })).max(40),
   tickers: z.array(z.string().regex(/^[A-Z0-9.^=-]{1,12}$/)).max(25),
   showIndexes: z.boolean(),
+  showLinks: z.boolean(),
   weather: z.object({
     name: z.string().max(120),
     lat: z.number().min(-90).max(90),
@@ -63,6 +64,7 @@ export const DEFAULTS: Settings = {
   ],
   tickers: ['VBIAX', 'VOO', 'AMZN'],
   showIndexes: true,
+  showLinks: true,
   weather: { name: 'Chicago, Illinois', lat: 41.88, lon: -87.63, unit: 'F', hourly: true },
   camera: { label: 'Driveway' },
   cards: [

@@ -124,7 +124,7 @@ function showPhoto(p) {
   };
   img.src = photoUrl(p, screenW());
   const who = p.credit.name === 'Unsplash' ? '' : `Photo by <a href="${esc(p.credit.link)}">${esc(p.credit.name)}</a> on `;
-  $('credit').innerHTML = `#${esc(p.kw)} · ${who}<a href="https://unsplash.com/?utm_source=portal&utm_medium=referral">Unsplash</a>`;
+  $('credit').innerHTML = `${who}<a href="https://unsplash.com/?utm_source=portal&utm_medium=referral">Unsplash</a>`;
   const fav = S?.favs.some((f) => f.id === p.id);
   $('favPhoto').classList.toggle('on', Boolean(fav));
   $('favPhoto').setAttribute('aria-pressed', String(Boolean(fav)));
@@ -192,12 +192,6 @@ function keywordEditor() {
   return S.keywords.map((k, i) => `<span class="kw-tog ${k.on ? 'on' : ''}"><button data-tog="${i}" aria-pressed="${k.on}">#${esc(k.name)}</button><button class="x" data-del="${i}" aria-label="Remove ${esc(k.name)}">×</button></span>`).join('')
     || '<span class="note" style="margin:0">No keywords. Add one.</span>';
 }
-function renderKeywords() {
-  if (!S) return;
-  $('kwChips').innerHTML = S.keywords.filter((k) => k.on).map((k) => `<button class="kw-chip" data-kw><b>#</b>${esc(k.name)}</button>`).join('')
-    || '<button class="kw-chip" data-kw>+ keyword</button>';
-  $('kwPopList').innerHTML = keywordEditor();
-}
 function kwHandlers(container) {
   container.addEventListener('click', (e) => {
     const t = e.target.closest('[data-tog]');
@@ -213,16 +207,6 @@ function addKeyword(v) {
 }
 /** After a keyword change, the photo queued for the next load may be from an old keyword. */
 function refreshPhotoQueue() { upcoming = null; prepareNext(); }
-kwHandlers($('kwPopList'));
-$('kwPopAdd').onsubmit = (e) => { e.preventDefault(); addKeyword($('kwPopInput').value); $('kwPopInput').value = ''; };
-$('kwChips').addEventListener('click', (e) => {
-  if (!e.target.closest('[data-kw]')) return;
-  $('kwPop').hidden = !$('kwPop').hidden;
-  if (!$('kwPop').hidden) $('kwPopInput').focus();
-});
-document.addEventListener('click', (e) => {
-  if (!$('kwPop').hidden && !e.target.closest('#kwPop, [data-kw]')) $('kwPop').hidden = true;
-});
 
 /* ================= dock ================= */
 let filterText = '';
@@ -230,8 +214,10 @@ let statuses = cached('status') || {};
 const monogram = (n) => n.slice(0, 1).toUpperCase();
 const STATUS_TEXT = { ok: 'Up', slow: 'Slow to respond', down: 'Not responding' };
 
+const dockVisible = () => S?.showLinks !== false && !local.focus; // settings saved before showLinks existed lack it
 function renderDock() {
   if (!S) return -1;
+  $('dock').hidden = !dockVisible();
   const q = filterText.toLowerCase();
   let firstMatch = -1;
   const tiles = S.links.map((l, i) => {
@@ -263,7 +249,7 @@ const staleNote = (key) => (moduleFailed[key] && cache[key] ? ` · as of ${fmtTi
 let scoresExpanded = false;
 function side(s, lose) {
   if (!s) return '';
-  return `<div class="side ${lose ? 'lose' : ''}"><i class="bar" style="background:${esc(s.color)}"></i><span class="abbr">${esc(s.abbr)}</span>${s.score != null ? `<span class="score">${s.score}</span>` : ''}</div>`;
+  return `<div class="side ${lose ? 'lose' : ''}"><i class="bar" style="background:${esc(s.color)}"></i><span class="tname">${esc(s.name || s.abbr)}</span>${s.score != null ? `<span class="score">${s.score}</span>` : ''}</div>`;
 }
 function whenText(ms) {
   const d = new Date(ms), now = new Date();
@@ -277,7 +263,7 @@ function whenText(ms) {
 function gameRow(g) {
   const team = g.team;
   if (!g.event) {
-    return `<div class="game quiet">${side({ abbr: team.abbr, color: team.color })}<span style="margin-left:20px">${esc(team.name)} · no games scheduled</span></div>`;
+    return `<div class="game quiet"><div class="matchup">${side({ name: team.name, color: team.color })}</div><div class="status">No games scheduled</div></div>`;
   }
   const e = g.event;
   const us = e.sides.find((s) => s.id === team.id) || e.sides[0];
@@ -285,7 +271,7 @@ function gameRow(g) {
   const sub = [e.tv, e.note].filter(Boolean).map(esc).join(' · ');
   let matchup, status;
   if (g.state === 'today' || g.state === 'next') {
-    matchup = side(us) + side(them && { ...them, abbr: `${us.home ? 'vs' : '@'} ${them.abbr}` });
+    matchup = side(us) + side(them && { ...them, name: `${us.home ? 'vs' : '@'} ${them.name || them.abbr}` });
     status = `<span class="tag">${g.league}</span> <span class="big">${whenText(e.date)}</span>${sub}`;
   } else {
     const won = g.state === 'final' && (us.winner ?? (us.score ?? 0) > (them?.score ?? 0));
@@ -406,7 +392,6 @@ function openTheater() {
   const cam = cached('camera');
   if (!cam || cam.none) return;
   $('theater').hidden = false;
-  $('kwPop').hidden = true;
   $('theaterTitle').textContent = `${S?.camera.label || 'Camera'} · ${dayLabel(cam.date)}`;
   const v = $('video');
   if (!v.src.endsWith(cam.video)) { v.src = cam.video; v.poster = cam.poster; }
@@ -683,11 +668,13 @@ function renderSettings() {
     const label = { scores: 'Scores', stocks: 'Stocks', camera: 'Camera' };
     P.innerHTML = `<section><h3>Cards · left to right</h3><div class="list">${S.cards.map((c, i) => `<div class="li"><span class="grow">${label[c.id]}</span>${moveBtns('cards', i, S.cards.length)}
         <input type="checkbox" class="switch" data-card="${i}" ${c.on ? 'checked' : ''} aria-label="Show ${label[c.id]}"></div>`).join('')}</div></section>
-      <section><div class="row"><span>Focus mode: photo, clock and sites only<br><small class="note">Shortcut: <kbd>.</kbd> · remembered on this browser</small></span><input type="checkbox" class="switch" id="focusSw" ${local.focus ? 'checked' : ''}></div></section>`;
+      <section><div class="row"><span>Show the sites bar</span><input type="checkbox" class="switch" id="linksSw" ${S.showLinks !== false ? 'checked' : ''}></div></section>
+      <section><div class="row"><span>Focus mode: photo, clock and weather only<br><small class="note">Shortcut: <kbd>.</kbd> · remembered on this browser</small></span><input type="checkbox" class="switch" id="focusSw" ${local.focus ? 'checked' : ''}></div></section>`;
     P.querySelectorAll('[data-card]').forEach((sw) => (sw.onchange = () => {
       const i = +sw.dataset.card;
       change(`${label[S.cards[i].id]} ${sw.checked ? 'shown' : 'hidden'}`, (s) => (s.cards[i].on = sw.checked));
     }));
+    $('linksSw').onchange = (e) => change(e.target.checked ? 'Sites bar shown' : 'Sites bar hidden', (s) => (s.showLinks = e.target.checked));
     $('focusSw').onchange = (e) => setFocus(e.target.checked);
   }
 }
@@ -709,7 +696,6 @@ $('tabpanel').addEventListener('click', (e) => {
 function openSettings() {
   if (!S) return;
   $('drawer').classList.add('open');
-  $('kwPop').hidden = true;
   renderSettings();
   setTimeout(() => $('tabs').querySelector('[aria-selected="true"]')?.focus(), 50);
 }
@@ -720,6 +706,7 @@ $('closeSettings').onclick = closeSettings;
 function setFocus(on) {
   local.focus = on;
   saveLocal();
+  renderDock();
   renderCards();
   if ($('drawer').classList.contains('open')) renderSettings();
 }
@@ -731,16 +718,15 @@ document.addEventListener('keydown', (e) => {
     if (!$('keys').hidden) { $('keys').hidden = true; return; }
     if (!$('theater').hidden) return closeTheater();
     if ($('drawer').classList.contains('open')) return closeSettings();
-    if (!$('kwPop').hidden) { $('kwPop').hidden = true; return; }
     if (filterText) { filterText = ''; renderDock(); }
     return;
   }
   if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (!$('theater').hidden || $('drawer').classList.contains('open') || !$('kwPop').hidden) return;
+  if (!$('theater').hidden || $('drawer').classList.contains('open')) return;
   if (!$('keys').hidden) $('keys').hidden = true;
   if (/^[1-9]$/.test(e.key)) { e.preventDefault(); openLink(+e.key - 1, e.shiftKey); return; }
   if (e.key === '?') { e.preventDefault(); $('keys').hidden = false; return; }
-  if (/^[a-z]$/i.test(e.key)) { e.preventDefault(); filterText += e.key; renderDock(); return; }
+  if (/^[a-z]$/i.test(e.key) && dockVisible()) { e.preventDefault(); filterText += e.key; renderDock(); return; }
   if (e.key === 'Backspace' && filterText) { e.preventDefault(); filterText = filterText.slice(0, -1); renderDock(); return; }
   if (e.key === 'Enter' && filterText) { e.preventDefault(); const i = renderDock(); if (i >= 0) openLink(i, e.shiftKey); return; }
   if (filterText) return;
@@ -752,7 +738,6 @@ $('keys').onclick = () => ($('keys').hidden = true);
 
 /* ================= boot ================= */
 function renderAll() {
-  renderKeywords();
   renderDock();
   renderCards();
   renderWeather();

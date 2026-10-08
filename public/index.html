@@ -27,7 +27,6 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
     </button>
     <div class="photo-ctl">
-      <div class="kw-chips" id="kwChips"></div>
       <button class="iconbtn" id="nextPhoto" title="Next photo  (Space)" aria-label="Next photo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg>
       </button>
@@ -55,13 +54,6 @@
     <span class="hint"><kbd>?</kbd> shortcuts</span>
     <span id="credit"></span>
   </footer>
-</div>
-
-<div class="popover panel" id="kwPop" hidden>
-  <h3>Photo keywords</h3>
-  <div class="kw-edit" id="kwPopList"></div>
-  <form class="addrow" id="kwPopAdd"><input id="kwPopInput" placeholder="Add a keyword" aria-label="Add a keyword"><button class="btn">Add</button></form>
-  <p class="note">Each load picks one active keyword at random.</p>
 </div>
 
 <aside class="drawer panel" id="drawer" aria-label="Settings">
@@ -99,7 +91,7 @@
       <dt><kbd>a</kbd>–<kbd>z</kbd></dt><dd style="margin:0">Filter sites, <kbd>Enter</kbd> opens the first match</dd>
       <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd style="margin:0">Open the match in a new tab</dd>
       <dt><kbd>Space</kbd></dt><dd style="margin:0">Next photo</dd>
-      <dt><kbd>.</kbd></dt><dd style="margin:0">Focus mode (hide cards)</dd>
+      <dt><kbd>.</kbd></dt><dd style="margin:0">Focus mode (hide sites and cards)</dd>
       <dt><kbd>,</kbd></dt><dd style="margin:0">Settings</dd>
       <dt><kbd>Esc</kbd></dt><dd style="margin:0">Close / clear filter</dd>
     </dl>

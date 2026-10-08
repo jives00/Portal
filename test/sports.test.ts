@@ -11,7 +11,7 @@ function ev(id: string, state: GameEvent['state'], date: number, teams = ['16', 
     date,
     detail: '',
     link: '',
-    sides: teams.map((t, i) => ({ id: t, abbr: t, color: '#fff', home: i === 0 })),
+    sides: teams.map((t, i) => ({ id: t, name: t, abbr: t, color: '#fff', home: i === 0 })),
   };
 }
 
@@ -70,7 +70,7 @@ describe('normalizeEvent', () => {
             notes: [{ headline: 'NLDS - Game 3' }],
             broadcasts: [{ names: ['TBS'] }],
             competitors: [
-              { homeAway: 'home', score: '2', team: { id: '8', abbreviation: 'MIL', color: '13294b', alternateColor: 'ffc52f' } },
+              { homeAway: 'home', score: '2', team: { id: '8', displayName: 'Milwaukee Brewers', abbreviation: 'MIL', color: '13294b', alternateColor: 'ffc52f' } },
               { homeAway: 'away', score: '4', team: { id: '16', abbreviation: 'CHC', color: '0e3386', alternateColor: 'cc3433' } },
             ],
           },
@@ -86,8 +86,8 @@ describe('normalizeEvent', () => {
       tv: 'TBS',
       link: 'https://www.espn.com/mlb/game/_/gameId/401',
     });
-    expect(e?.sides.map((s) => [s.abbr, s.score, s.home])).toEqual([
-      ['MIL', 2, true],
+    expect(e?.sides.map((s) => [s.name, s.score, s.home])).toEqual([
+      ['Milwaukee Brewers', 2, true],
       ['CHC', 4, false],
     ]);
   });

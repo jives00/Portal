@@ -22,6 +22,7 @@ export interface Team {
 
 export interface Side {
   id: string;
+  name: string;
   abbr: string;
   color: string;
   score?: number;
@@ -132,6 +133,7 @@ export function normalizeEvent(e: any, league: League): GameEvent | null {
       const score = state === 'pre' || raw == null || raw === '' ? undefined : Number(typeof raw === 'object' ? raw.value : raw);
       return {
         id: String(x.team?.id ?? x.id),
+        name: x.team?.displayName ?? x.team?.abbreviation ?? '?',
         abbr: x.team?.abbreviation ?? '?',
         color: readableColor(x.team?.color, x.team?.alternateColor),
         score: Number.isFinite(score) ? score : undefined,
@@ -218,7 +220,10 @@ export async function getScores(teams: { league: League; id: string }[]): Promis
       // nextEvent comes from a different endpoint without team colors; borrow them from the team list.
       picked.event?.sides.forEach((s) => {
         const known = ctx.teams.find((t) => t.id === s.id);
-        if (known) s.color = known.color;
+        if (known) {
+          s.color = known.color;
+          s.name = known.name;
+        }
       });
       return { league, team, ...picked };
     }),

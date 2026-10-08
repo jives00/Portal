@@ -68,13 +68,6 @@ button { cursor: pointer; }
 .iconbtn.on { color: var(--accent); }
 .photo-ctl { display: flex; align-items: center; gap: 4px; opacity: .7; transition: opacity .2s; }
 .photo-ctl:hover, .photo-ctl:focus-within { opacity: 1; }
-.kw-chips { display: flex; gap: 6px; margin-right: 6px; }
-.kw-chip {
-  border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(10px);
-  border-radius: 999px; padding: 4px 11px; font-size: 13px; color: var(--ink);
-}
-.kw-chip:hover { border-color: var(--accent); }
-.kw-chip b { color: var(--accent); font-weight: 600; }
 
 .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; padding-block: 2vh; min-height: 200px; }
 .clock {
@@ -164,7 +157,7 @@ button { cursor: pointer; }
 .matchup { display: grid; gap: 3px; min-width: 0; }
 .side { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .bar { width: 4px; height: 16px; border-radius: 2px; flex: none; }
-.side .abbr { font: 600 17px/1 var(--f-display); letter-spacing: .04em; width: 3.4em; }
+.side .tname { font: 600 17px/1.1 var(--f-display); letter-spacing: .03em; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side .score { font: 600 18px/1 var(--f-body); margin-left: auto; font-variant-numeric: tabular-nums; }
 .side.lose { color: var(--ink-3); }
 .status { text-align: right; font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
@@ -175,8 +168,8 @@ button { cursor: pointer; }
 @keyframes pulse { 50% { opacity: .25; } }
 .wl { display: inline-block; font: 700 11px/1 var(--f-body); padding: 3px 6px; border-radius: 5px; color: #fff; }
 .wl.w { background: var(--up); } .wl.l { background: var(--down); }
-.game.quiet { grid-template-columns: 1fr; color: var(--ink-3); font-size: 13px; }
-.game.quiet .side .abbr { color: var(--ink-2); }
+.game.quiet { color: var(--ink-3); }
+.game.quiet .side .tname { color: var(--ink-2); }
 .more { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--accent); font-size: 13px; }
 
 /* stocks */
@@ -213,8 +206,7 @@ button { cursor: pointer; }
 
 /* ---------- popover / drawer / overlay shared ---------- */
 .panel { background: var(--glass-strong); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid var(--line); }
-.popover { position: absolute; z-index: 20; top: 58px; right: var(--gutter); width: 300px; border-radius: 14px; padding: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.4); }
-.popover h3, .drawer h3 { margin: 0 0 8px; font: 600 13px/1 var(--f-display); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+.drawer h3 { margin: 0 0 8px; font: 600 13px/1 var(--f-display); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
 
 .kw-edit { display: flex; flex-wrap: wrap; gap: 6px; }
 .kw-tog { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.05); padding: 4px 4px 4px 11px; font-size: 13px; }
@@ -288,7 +280,6 @@ button { cursor: pointer; }
   .wx { align-self: stretch; }
   .wx-hours { padding-left: 0; border-left: 0; width: 100%; justify-content: space-between; }
   .cards { grid-template-columns: minmax(0, 1fr); }
-  .kw-chips { display: none; }
   .hero { min-height: 34vh; }
   .hint { display: none; }
 }
