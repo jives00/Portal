@@ -24,7 +24,6 @@ export const SettingsSchema = z.object({
   links: z.array(z.object({ name: z.string().trim().min(1).max(40), url: z.string().url() })).max(30),
   teams: z.array(z.object({ league: z.enum(LEAGUES), id: z.string().min(1) })).max(40),
   tickers: z.array(z.string().regex(/^[A-Z0-9.^=-]{1,12}$/)).max(25),
-  showIndexes: z.boolean(),
   showLinks: z.boolean(),
   weather: z.object({
     name: z.string().max(120),
@@ -63,7 +62,6 @@ export const DEFAULTS: Settings = {
     { league: 'NFL', id: '3' },
   ],
   tickers: ['VBIAX', 'VOO', 'AMZN'],
-  showIndexes: true,
   showLinks: true,
   weather: { name: 'Chicago, Illinois', lat: 41.88, lon: -87.63, unit: 'F', hourly: true },
   camera: { label: 'Driveway' },
@@ -73,6 +71,18 @@ export const DEFAULTS: Settings = {
     { id: 'camera', on: true },
   ],
 };
+
+const OLD_INDEX_ROW = ['^GSPC', '^IXIC', '^DJI'];
+
+/** Older files had a separate S&P/Nasdaq/Dow row (`showIndexes`). Indexes are now watchlist rows. */
+export function migrate(raw: Record<string, unknown>): Record<string, unknown> {
+  const { showIndexes, ...rest } = raw;
+  if (showIndexes === true && Array.isArray(rest.tickers)) {
+    const tickers = rest.tickers as string[];
+    rest.tickers = [...tickers, ...OLD_INDEX_ROW.filter((s) => !tickers.includes(s))].slice(0, 25);
+  }
+  return rest;
+}
 
 /** Settings live in one JSON file on the data volume, so every browser sees the same page. */
 export class SettingsStore {
@@ -107,7 +117,7 @@ export class SettingsStore {
       return structuredClone(DEFAULTS);
     }
     // Merge over defaults so settings saved by an older version pick up new fields.
-    const result = SettingsSchema.safeParse({ ...structuredClone(DEFAULTS), ...(raw as object) });
+    const result = SettingsSchema.safeParse(migrate({ ...structuredClone(DEFAULTS), ...(raw as object) }));
     if (result.success) return result.data;
     this.log.warn(`${this.file} failed validation, using defaults: ${result.error.message}`);
     return structuredClone(DEFAULTS);

@@ -37,6 +37,8 @@ button { cursor: pointer; }
 
 /* ---------- background ---------- */
 .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: var(--base); transition: background .6s; }
+.bg .photo { position: absolute; inset: 0; transition: opacity .2s ease; }
+.bg .photo.out { opacity: 0; }
 .bg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .bg .lq { filter: blur(28px); transform: scale(1.12); }
 .bg .hq { opacity: 0; transition: opacity .6s ease; }
@@ -66,7 +68,8 @@ button { cursor: pointer; }
 .iconbtn:hover { background: var(--glass); border-color: var(--line); color: var(--ink); }
 .iconbtn svg { width: 18px; height: 18px; }
 .iconbtn.on { color: var(--accent); }
-.photo-ctl { display: flex; align-items: center; gap: 4px; opacity: .7; transition: opacity .2s; }
+.photo-ctl { display: flex; align-items: center; gap: 4px; margin-left: auto; opacity: .7; transition: opacity .2s; }
+.photo-ctl .sep { width: 1px; height: 18px; background: var(--line); margin-inline: 4px; }
 .photo-ctl:hover, .photo-ctl:focus-within { opacity: 1; }
 
 .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; padding-block: 2vh; min-height: 200px; }
@@ -150,6 +153,12 @@ button { cursor: pointer; }
 .card-h .meta .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 5px; vertical-align: 1px; }
 .card.stale { opacity: .78; }
 
+.scroll {
+  flex: 1 1 0; min-height: 230px; overflow-y: auto; overflow-x: hidden;
+  margin-inline: -6px; padding-inline: 6px;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.22) transparent;
+}
+
 /* scores */
 .games { display: flex; flex-direction: column; }
 .game { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 8px 0; border-top: 1px solid var(--line); align-items: center; }
@@ -170,7 +179,6 @@ button { cursor: pointer; }
 .wl.w { background: var(--up); } .wl.l { background: var(--down); }
 .game.quiet { color: var(--ink-3); }
 .game.quiet .side .tname { color: var(--ink-2); }
-.more { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--accent); font-size: 13px; }
 
 /* stocks */
 .quotes { display: flex; flex-direction: column; }
@@ -179,12 +187,11 @@ button { cursor: pointer; }
 .sym { font: 600 18px/1 var(--f-display); letter-spacing: .05em; }
 .sub { display: block; font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
 .px { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-.chip { display: inline-block; min-width: 64px; text-align: center; margin-top: 4px; font: 600 12px/1 var(--f-body); font-variant-numeric: tabular-nums; padding: 4px 6px; border-radius: 6px; color: #fff; }
+.chg { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 4px; font-size: 12.5px; font-weight: 600; }
+.chg.up { color: #5fe0a0; } .chg.down { color: #ff8a80; }
+.chip { display: inline-block; min-width: 64px; text-align: center; font: 600 12px/1 var(--f-body); font-variant-numeric: tabular-nums; padding: 4px 6px; border-radius: 6px; color: #fff; }
 .chip.up { background: var(--up); } .chip.down { background: var(--down); }
 .spark { width: 96px; height: 34px; display: block; overflow: visible; }
-.idx { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 2px; }
-.idx span { font-size: 12px; color: var(--ink-2); background: rgba(255,255,255,.07); border-radius: 6px; padding: 3px 7px; font-variant-numeric: tabular-nums; }
-.idx b.up { color: #5fe0a0; font-weight: 600; } .idx b.down { color: #ff8a80; font-weight: 600; }
 
 /* camera */
 .poster { position: relative; display: block; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #000; padding: 0; }
@@ -280,6 +287,7 @@ button { cursor: pointer; }
   .wx { align-self: stretch; }
   .wx-hours { padding-left: 0; border-left: 0; width: 100%; justify-content: space-between; }
   .cards { grid-template-columns: minmax(0, 1fr); }
+  .scroll { flex: none; min-height: 0; max-height: 60vh; }
   .hero { min-height: 34vh; }
   .hint { display: none; }
 }

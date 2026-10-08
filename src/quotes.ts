@@ -11,7 +11,9 @@ export type MarketState = 'pre' | 'open' | 'post' | 'closed' | 'nav';
 export interface Quote {
   symbol: string;
   name: string;
-  kind: 'equity' | 'fund';
+  kind: 'equity' | 'fund' | 'index';
+  /** short display name for an index (S&P 500), since ^GSPC means nothing at a glance */
+  label?: string;
   price: number;
   prevClose: number;
   change: number;
@@ -82,12 +84,15 @@ export function getQuote(symbol: string): Promise<Quote> {
     const day = await chart(symbol, '1d', '5m');
     const m = day.meta;
     const fund = m.instrumentType === 'MUTUALFUND';
+    const index = m.instrumentType === 'INDEX';
+    const sym = m.symbol ?? symbol;
     const price = m.regularMarketPrice;
     const prev = m.chartPreviousClose ?? m.previousClose ?? price;
     const quote: Quote = {
-      symbol: m.symbol ?? symbol,
+      symbol: sym,
       name: m.longName ?? m.shortName ?? symbol,
-      kind: fund ? 'fund' : 'equity',
+      kind: fund ? 'fund' : index ? 'index' : 'equity',
+      label: index ? INDEX_LABELS[sym] ?? m.shortName ?? sym : undefined,
       price,
       prevClose: prev,
       change: price - prev,
@@ -108,24 +113,35 @@ export function getQuote(symbol: string): Promise<Quote> {
   });
 }
 
-export const INDEXES = [
-  { label: 'S&P', symbol: '^GSPC' },
-  { label: 'Nasdaq', symbol: '^IXIC' },
-  { label: 'Dow', symbol: '^DJI' },
-];
+const INDEX_LABELS: Record<string, string> = {
+  '^GSPC': 'S&P 500',
+  '^IXIC': 'Nasdaq',
+  '^DJI': 'Dow',
+  '^RUT': 'Russell 2000',
+  '^VIX': 'VIX',
+};
 
-export async function getQuotes(symbols: string[], withIndexes: boolean) {
+/** The main US indexes, offered as one-tap adds in Settings → Stocks. */
+export const INDEXES = Object.entries(INDEX_LABELS).map(([symbol, label]) => ({ symbol, label }));
+
+// Index symbols start with ^, which nobody types. Map the names people do type.
+const ALIASES: Record<string, string> = {
+  SPX: '^GSPC', 'S&P': '^GSPC', 'S&P500': '^GSPC', SP500: '^GSPC', GSPC: '^GSPC',
+  NASDAQ: '^IXIC', COMP: '^IXIC', IXIC: '^IXIC',
+  DOW: '^DJI', DJIA: '^DJI', DJI: '^DJI',
+  RUSSELL: '^RUT', RUSSELL2000: '^RUT', RUT: '^RUT',
+  VIX: '^VIX',
+};
+export const resolveSymbol = (input: string) => {
+  const s = input.trim().toUpperCase().replace(/\s+/g, '');
+  return ALIASES[s] ?? s;
+};
+
+export async function getQuotes(symbols: string[]) {
   const settled = await Promise.allSettled(symbols.map(getQuote));
-  const quotes = settled.map((r, i) =>
-    r.status === 'fulfilled' ? r.value : { symbol: symbols[i], error: (r.reason as Error).message },
-  );
-  let indexes: { label: string; changePct: number }[] = [];
-  if (withIndexes) {
-    const idx = await Promise.allSettled(INDEXES.map((x) => getQuote(x.symbol)));
-    indexes = INDEXES.flatMap((x, i) => {
-      const r = idx[i];
-      return r.status === 'fulfilled' ? [{ label: x.label, changePct: r.value.changePct }] : [];
-    });
-  }
-  return { quotes, indexes };
+  return {
+    quotes: settled.map((r, i) =>
+      r.status === 'fulfilled' ? r.value : { symbol: symbols[i], error: (r.reason as Error).message },
+    ),
+  };
 }

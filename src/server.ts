@@ -5,7 +5,7 @@ import { ZodError } from 'zod';
 import { CameraService } from './camera';
 import { UpstreamError } from './http';
 import { PhotoService } from './photos';
-import { getQuote, getQuotes } from './quotes';
+import { getQuote, getQuotes, resolveSymbol } from './quotes';
 import { LEAGUES, League, SettingsStore } from './settings';
 import { getScores, getTeams } from './sports';
 import { linkStatuses } from './status';
@@ -57,16 +57,13 @@ app.put('/api/settings', async (req) => settings.set(req.body));
 
 app.get<{ Querystring: { last?: string } }>('/api/photo', async (req) => photos.next(settings.get(), req.query.last));
 
-app.get('/api/quotes', async () => {
-  const s = settings.get();
-  return getQuotes(s.tickers, s.showIndexes);
-});
+app.get('/api/quotes', async () => getQuotes(settings.get().tickers));
 
 app.get<{ Querystring: { symbol?: string } }>('/api/quotes/lookup', async (req, reply) => {
-  const symbol = (req.query.symbol ?? '').trim().toUpperCase();
-  if (!/^[A-Z0-9.^=-]{1,12}$/.test(symbol)) return reply.status(400).send({ error: 'Enter a ticker symbol, like MSFT' });
+  const symbol = resolveSymbol(req.query.symbol ?? '');
+  if (!/^[A-Z0-9.^=-]{1,12}$/.test(symbol)) return reply.status(400).send({ error: 'Enter a ticker symbol, like MSFT or SPX' });
   const q = await getQuote(symbol);
-  return { symbol: q.symbol, name: q.name, kind: q.kind };
+  return { symbol: q.symbol, name: q.label ?? q.name, kind: q.kind };
 });
 
 app.get('/api/scores', async () => ({ games: await getScores(settings.get().teams) }));

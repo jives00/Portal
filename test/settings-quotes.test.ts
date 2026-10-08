@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { marketState, seriesFrom } from '../src/quotes';
+import { marketState, resolveSymbol, seriesFrom } from '../src/quotes';
 import { DEFAULTS, SettingsStore } from '../src/settings';
 import { probeUrl } from '../src/status';
 
@@ -25,11 +25,32 @@ describe('SettingsStore', () => {
     expect(new SettingsStore(file, quiet).get().weather.unit).toBe('F');
   });
 
+  it('turns the old index row into watchlist rows', () => {
+    const file = tmp();
+    fs.writeFileSync(file, JSON.stringify({ ...DEFAULTS, tickers: ['VOO', '^DJI'], showIndexes: true }));
+    const s = new SettingsStore(file, quiet).get();
+    expect(s.tickers).toEqual(['VOO', '^DJI', '^GSPC', '^IXIC']);
+    expect(s).not.toHaveProperty('showIndexes');
+  });
+
   it('rejects invalid settings without changing what is saved', () => {
     const store = new SettingsStore(tmp(), quiet);
     expect(() => store.set({ ...store.get(), tickers: ['not a symbol'] })).toThrow();
     expect(() => store.set({ ...store.get(), cards: [{ id: 'scores', on: true }, { id: 'scores', on: true }, { id: 'camera', on: true }] })).toThrow();
     expect(store.get().tickers).toEqual(DEFAULTS.tickers);
+  });
+});
+
+describe('resolveSymbol', () => {
+  it.each([
+    ['spx', '^GSPC'],
+    ['S&P 500', '^GSPC'],
+    ['Dow', '^DJI'],
+    ['nasdaq', '^IXIC'],
+    [' msft ', 'MSFT'],
+    ['^RUT', '^RUT'],
+  ])('%s → %s', (input, expected) => {
+    expect(resolveSymbol(input)).toBe(expected);
   });
 });
 

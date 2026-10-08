@@ -107,22 +107,28 @@ function accentFrom(hex) {
   return `hsl(${Math.round(h)} ${Math.round(Math.max(s, 0.6) * 100)}% 66%)`;
 }
 
-function showPhoto(p) {
+/** `ready` means the full-size image is already loaded, so it goes straight in with no blur-up. */
+function showPhoto(p, ready = false) {
   if (!p) return;
   current = p;
   const root = document.documentElement.style;
   root.setProperty('--base', p.color || '#3a3f48');
   root.setProperty('--accent', accentFrom(p.color));
   const hq = $('bgHq');
-  hq.classList.remove('on');
   hq.alt = p.alt || '';
   $('bgLq').src = photoUrl(p, 40);
-  const img = new Image();
-  img.onload = () => {
-    hq.src = img.src;
-    requestAnimationFrame(() => hq.classList.add('on'));
-  };
-  img.src = photoUrl(p, screenW());
+  if (ready) {
+    hq.src = photoUrl(p, screenW());
+    hq.classList.add('on');
+  } else {
+    hq.classList.remove('on');
+    const img = new Image();
+    img.onload = () => {
+      hq.src = img.src;
+      requestAnimationFrame(() => hq.classList.add('on'));
+    };
+    img.src = photoUrl(p, screenW());
+  }
   const who = p.credit.name === 'Unsplash' ? '' : `Photo by <a href="${esc(p.credit.link)}">${esc(p.credit.name)}</a> on `;
   $('credit').innerHTML = `${who}<a href="https://unsplash.com/?utm_source=portal&utm_medium=referral">Unsplash</a>`;
   const fav = S?.favs.some((f) => f.id === p.id);
@@ -138,12 +144,28 @@ async function prepareNext() {
     stash('nextPhoto', upcoming);
   } catch {}
 }
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+let swapping = false;
+/** Fade the current photo out, swap once the next one is loaded, fade back in (~.2s each way). */
 async function nextPhoto() {
-  if (upcoming) {
-    showPhoto(upcoming);
+  if (swapping) return;
+  swapping = true;
+  try {
+    let p = upcoming;
     upcoming = null;
-  } else {
-    try { showPhoto(await api(`api/photo?last=${encodeURIComponent(current?.id || '')}`)); } catch { return; }
+    if (!p) {
+      try { p = await api(`api/photo?last=${encodeURIComponent(current?.id || '')}`); } catch { return; }
+    }
+    const img = new Image();
+    img.src = photoUrl(p, screenW());
+    const loaded = img.decode().then(() => true, () => false);
+    $('bgPhoto').classList.add('out');
+    // If the image is slow (nothing prefetched), stop waiting and let it blur up as before.
+    const [ready] = await Promise.all([Promise.race([loaded, wait(2500).then(() => false)]), wait(200)]);
+    showPhoto(p, ready);
+    $('bgPhoto').classList.remove('out');
+  } finally {
+    swapping = false;
   }
   prepareNext();
 }
@@ -246,7 +268,6 @@ const moduleFailed = {};
 const staleNote = (key) => (moduleFailed[key] && cache[key] ? ` · as of ${fmtTime(cache[key].at)}` : '');
 
 /* ================= scores ================= */
-let scoresExpanded = false;
 function side(s, lose) {
   if (!s) return '';
   return `<div class="side ${lose ? 'lose' : ''}"><i class="bar" style="background:${esc(s.color)}"></i><span class="tname">${esc(s.name || s.abbr)}</span>${s.score != null ? `<span class="score">${s.score}</span>` : ''}</div>`;
@@ -287,11 +308,9 @@ function scoresCard() {
   const data = cached('scores');
   if (!data) return `<article class="card"><div class="card-h"><h2>Scores</h2></div>${moduleFailed.scores ? '<p class="empty">Scores are unavailable right now.</p>' : skeleton(3)}</article>`;
   const rows = data.games;
-  const shown = scoresExpanded ? rows : rows.slice(0, 4);
-  const html = shown.map(gameRow).join('') || '<p class="empty">You aren\'t following any teams. Add some in Settings → Sports.</p>';
-  const more = rows.length > 4 ? `<button class="more" data-more>${scoresExpanded ? 'Show less' : `+${rows.length - 4} more`}</button>` : '';
+  const html = rows.map(gameRow).join('') || '<p class="empty">You aren\'t following any teams. Add some in Settings → Sports.</p>';
   const live = rows.filter((r) => r.state === 'live').length;
-  return `<article class="card ${moduleFailed.scores ? 'stale' : ''}"><div class="card-h"><h2>Scores</h2><span class="meta">${live ? `${live} live · ` : ''}${rows.length} teams${staleNote('scores')}</span></div><div class="games">${html}</div>${more}</article>`;
+  return `<article class="card ${moduleFailed.scores ? 'stale' : ''}"><div class="card-h"><h2>Scores</h2><span class="meta">${live ? `${live} live · ` : ''}${rows.length} teams${staleNote('scores')}</span></div><div class="games scroll">${html}</div></article>`;
 }
 
 /* ================= stocks ================= */
@@ -313,6 +332,7 @@ function sparkline(points, base, up, x0, x1) {
     <path d="${d}" fill="none" stroke="${c}" stroke-width="1.6" stroke-linejoin="round"/>
     <circle cx="${lx}" cy="${ly}" r="2.6" fill="${c}"/></svg>`;
 }
+const money = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function quoteRow(q) {
   if (q.error) return `<div class="quote"><div style="min-width:0"><span class="sym">${esc(q.symbol)}</span><span class="sub">${esc(q.error)}</span></div><span></span><span class="unavail">Unavailable</span></div>`;
   const up = q.change >= 0;
@@ -328,18 +348,18 @@ function quoteRow(q) {
     // Before the open the series is yesterday's session; show it against its own bounds.
     const s = q.series.filter((p) => p.t >= x0 && p.t <= x1);
     spark = s.length > 1 ? sparkline(s, q.prevClose, up, x0, x1) : sparkline(q.series, q.prevClose, up, q.series[0]?.t ?? 0, q.series.at(-1)?.t ?? 1);
-    sub = esc(q.name);
+    sub = esc(q.kind === 'index' ? `${q.name} · index` : q.name);
   }
-  const pct = `${up ? '+' : '−'}${Math.abs(q.changePct).toFixed(2)}%`;
+  const sign = up ? '+' : '−';
   return `<a class="quote" href="https://finance.yahoo.com/quote/${encodeURIComponent(q.symbol)}" target="_blank" rel="noopener">
-    <div style="min-width:0"><span class="sym">${esc(q.symbol)}</span><span class="sub">${sub}</span></div>${spark}
-    <div class="px">${q.price.toFixed(2)}<br><span class="chip ${up ? 'up' : 'down'}">${pct}</span></div></a>`;
+    <div style="min-width:0"><span class="sym">${esc(q.label || q.symbol)}</span><span class="sub">${sub}</span></div>${spark}
+    <div class="px">${money(q.price)}<span class="chg ${up ? 'up' : 'down'}">${sign}${money(Math.abs(q.change))}<span class="chip ${up ? 'up' : 'down'}">${sign}${Math.abs(q.changePct).toFixed(2)}%</span></span></div></a>`;
 }
 function stocksCard() {
   const data = cached('quotes');
   if (!data) return `<article class="card"><div class="card-h"><h2>Stocks</h2></div>${moduleFailed.quotes ? '<p class="empty">Quotes are unavailable right now.</p>' : skeleton(3)}</article>`;
   const rows = data.quotes.map(quoteRow).join('') || '<p class="empty">Your watchlist is empty. Add symbols in Settings → Stocks.</p>';
-  const lead = data.quotes.find((q) => q.kind === 'equity');
+  const lead = data.quotes.find((q) => q.kind === 'equity' || q.kind === 'index');
   let meta = '';
   if (lead) {
     if (lead.market === 'open') meta = `<span class="live-dot"></span>Open · updated ${fmtTime(cache.quotes.at)}`;
@@ -347,9 +367,7 @@ function stocksCard() {
     else meta = `Closed · as of ${lead.session ? fmtTime(lead.session.end) : fmtTime(lead.asOf)}`;
   }
   const closed = !lead || lead.market !== 'open';
-  const idx = S?.showIndexes && data.indexes?.length
-    ? `<div class="idx">${data.indexes.map((i) => `<span>${esc(i.label)} <b class="${i.changePct >= 0 ? 'up' : 'down'}">${i.changePct >= 0 ? '+' : '−'}${Math.abs(i.changePct).toFixed(2)}%</b></span>`).join('')}</div>` : '';
-  return `<article class="card ${closed || moduleFailed.quotes ? 'stale' : ''}"><div class="card-h"><h2>Stocks</h2><span class="meta">${meta}${staleNote('quotes')}</span></div><div class="quotes">${rows}</div>${idx}</article>`;
+  return `<article class="card ${closed || moduleFailed.quotes ? 'stale' : ''}"><div class="card-h"><h2>Stocks</h2><span class="meta">${meta}${staleNote('quotes')}</span></div><div class="quotes scroll">${rows}</div></article>`;
 }
 
 /* ================= camera ================= */
@@ -384,7 +402,6 @@ function renderCards() {
 }
 $('cards').addEventListener('click', (e) => {
   if (e.target.closest('[data-play]')) openTheater();
-  if (e.target.closest('[data-more]')) { scoresExpanded = !scoresExpanded; renderCards(); }
 });
 
 /* ================= theater ================= */
@@ -516,6 +533,14 @@ const ICON = {
 };
 const TABS = ['Background', 'Weather', 'Links', 'Sports', 'Stocks', 'Camera', 'Layout'];
 const LEAGUES = ['NFL', 'NBA', 'NCAAB', 'MLB'];
+// Mirrors INDEX_LABELS in src/quotes.ts.
+const INDEXES = [
+  { symbol: '^GSPC', label: 'S&P 500' },
+  { symbol: '^IXIC', label: 'Nasdaq' },
+  { symbol: '^DJI', label: 'Dow' },
+  { symbol: '^RUT', label: 'Russell 2000' },
+  { symbol: '^VIX', label: 'VIX' },
+];
 let tab = 'Background';
 let sportsLeague = 'NFL';
 let teamQuery = '';
@@ -634,18 +659,23 @@ function renderSettings() {
 
   if (tab === 'Stocks') {
     const names = Object.fromEntries((cached('quotes')?.quotes || []).filter((q) => q.name).map((q) => [q.symbol, q]));
-    P.innerHTML = `<section><h3>Watchlist</h3><div class="list">${S.tickers.map((s, i) => `<div class="li"><span class="grow"><b style="font:600 16px var(--f-display);letter-spacing:.05em">${esc(s)}</b><small>${names[s] ? esc(names[s].kind === 'fund' ? `${names[s].name} · daily NAV` : names[s].name) : ''}</small></span>
+    const idxOff = INDEXES.filter((x) => !S.tickers.includes(x.symbol));
+    P.innerHTML = `<section><h3>Watchlist</h3><div class="list">${S.tickers.map((s, i) => `<div class="li"><span class="grow"><b style="font:600 16px var(--f-display);letter-spacing:.05em">${esc(INDEXES.find((x) => x.symbol === s)?.label || s)}</b><small>${names[s] ? esc(names[s].kind === 'fund' ? `${names[s].name} · daily NAV` : names[s].name) : ''}</small></span>
         ${moveBtns('tickers', i, S.tickers.length)}<button class="mini" data-act="del" data-kind="tickers" data-i="${i}" aria-label="Remove ${esc(s)}">${ICON.x}</button></div>`).join('') || noteRow('No symbols yet.')}</div>
-      <form class="addrow" id="tickAdd"><input id="tickInput" placeholder="Symbol, e.g. MSFT" aria-label="Add a symbol" style="text-transform:uppercase"><button class="btn" id="tickBtn">Add</button></form>
+      <form class="addrow" id="tickAdd"><input id="tickInput" placeholder="Symbol, e.g. MSFT or SPX" aria-label="Add a symbol" style="text-transform:uppercase"><button class="btn" id="tickBtn">Add</button></form>
       <p class="err" id="tickErr" hidden></p></section>
-      <section><div class="row"><span>Show S&amp;P, Nasdaq and Dow row</span><input type="checkbox" class="switch" id="idxSw" ${S.showIndexes ? 'checked' : ''}></div></section>`;
+      <section><h3>Market indexes</h3>${idxOff.length
+        ? `<div class="kw-edit" id="idxAdd">${idxOff.map((x) => `<button class="btn" data-sym="${esc(x.symbol)}" data-label="${esc(x.label)}">+ ${esc(x.label)}</button>`).join('')}</div>`
+        : '<p class="note" style="margin:0">All of them are on your watchlist.</p>'}
+      <p class="note">Or type SPX, Dow or Nasdaq in the box above.</p></section>`;
     $('tickAdd').onsubmit = async (e) => {
       e.preventDefault();
       const sym = $('tickInput').value.trim().toUpperCase();
-      if (!sym || S.tickers.includes(sym)) return;
+      if (!sym) return;
       $('tickBtn').disabled = true;
       try {
         const q = await api(`api/quotes/lookup?symbol=${encodeURIComponent(sym)}`);
+        if (S.tickers.includes(q.symbol)) throw new Error(`${q.name} is already on your watchlist`);
         change(`Added ${q.symbol} · ${q.name}`, (s) => s.tickers.push(q.symbol), refreshQuotes);
       } catch (err) {
         $('tickErr').textContent = err.message;
@@ -653,7 +683,10 @@ function renderSettings() {
         $('tickBtn').disabled = false;
       }
     };
-    $('idxSw').onchange = (e) => change(e.target.checked ? 'Index row on' : 'Index row off', (s) => (s.showIndexes = e.target.checked), refreshQuotes);
+    $('idxAdd')?.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-sym]');
+      if (b) change(`Added ${b.dataset.label}`, (s) => s.tickers.push(b.dataset.sym), refreshQuotes);
+    });
   }
 
   if (tab === 'Camera') {
