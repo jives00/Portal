@@ -1,0 +1,7 @@
+node_modules/
+dist/
+data/
+.env
+.claude/
+# Mockup assets are real driveway footage; keep them off GitHub.
+mockup/assets/

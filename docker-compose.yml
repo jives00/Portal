@@ -1,0 +1,17 @@
+# Lives at /volume2/docker/portal on the NAS, next to a .env holding UNSPLASH_ACCESS_KEY.
+services:
+  portal:
+    image: ghcr.io/jives00/portal:latest
+    container_name: portal
+    ports:
+      - "3012:3012"
+    env_file:
+      - .env
+    environment:
+      - TZ=America/Chicago
+      - NAS_HOST=192.168.0.105
+    volumes:
+      - /volume2/docker/portal/data:/data
+      # Read-only: Portal never changes the original recordings.
+      - /volume2/SecurityCameras:/cameras:ro
+    restart: unless-stopped

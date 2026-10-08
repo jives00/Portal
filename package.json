@@ -1,0 +1,24 @@
+{
+  "name": "portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal browser home page: Unsplash backdrop, weather, site links, scores, stocks, and the daily camera summary.",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/static": "^7",
+    "fastify": "^4",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4",
+    "typescript": "^5",
+    "vitest": "^2"
+  }
+}

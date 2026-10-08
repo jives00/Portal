@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101216">
+<title>Portal</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.unsplash.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@200;300;600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="app.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+
+<div class="bg" id="bg">
+  <img class="lq" id="bgLq" alt="">
+  <img class="hq" id="bgHq" alt="">
+  <div class="scrim"></div>
+</div>
+
+<div class="stage">
+  <div class="topbar">
+    <button class="iconbtn" id="openSettings" title="Settings  ( , )" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+    <div class="photo-ctl">
+      <div class="kw-chips" id="kwChips"></div>
+      <button class="iconbtn" id="nextPhoto" title="Next photo  (Space)" aria-label="Next photo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg>
+      </button>
+      <button class="iconbtn" id="favPhoto" title="Keep this photo in rotation" aria-label="Favorite photo" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>
+      </button>
+      <button class="iconbtn" id="banPhoto" title="Never show this photo again" aria-label="Never show this photo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <section class="hero">
+    <h1 class="clock tnum" id="clock">9:41</h1>
+    <p class="dateline" id="dateline"></p>
+    <div class="wx" id="wx"></div>
+  </section>
+
+  <nav class="dock" id="dock" aria-label="My sites"></nav>
+
+  <section class="cards" id="cards"></section>
+
+  <footer class="foot">
+    <span><span id="offline" class="pill" hidden>Can't reach Portal's server · showing saved data</span></span>
+    <span class="hint"><kbd>?</kbd> shortcuts</span>
+    <span id="credit"></span>
+  </footer>
+</div>
+
+<div class="popover panel" id="kwPop" hidden>
+  <h3>Photo keywords</h3>
+  <div class="kw-edit" id="kwPopList"></div>
+  <form class="addrow" id="kwPopAdd"><input id="kwPopInput" placeholder="Add a keyword" aria-label="Add a keyword"><button class="btn">Add</button></form>
+  <p class="note">Each load picks one active keyword at random.</p>
+</div>
+
+<aside class="drawer panel" id="drawer" aria-label="Settings">
+  <div class="drawer-h">
+    <h2>Settings</h2>
+    <button class="iconbtn" id="closeSettings" aria-label="Close settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="tabpanel" id="tabpanel" role="tabpanel"></div>
+</aside>
+
+<div class="theater" id="theater" hidden>
+  <div class="theater-box">
+    <div class="theater-h">
+      <h2 id="theaterTitle">Driveway</h2>
+      <span class="sp"></span>
+      <button class="iconbtn" id="closeTheater" aria-label="Close player  (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <video id="video" controls muted playsinline preload="none"></video>
+    <div class="theater-c">
+      <span id="clipLabel"></span>
+      <div class="seg" id="speed" aria-label="Playback speed">
+        <button aria-pressed="true" data-r="1">1×</button><button aria-pressed="false" data-r="2">2×</button><button aria-pressed="false" data-r="4">4×</button>
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<div class="keys" id="keys" hidden>
+  <div class="panel">
+    <h3 style="margin:0 0 14px;font:600 13px/1 var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)">Shortcuts</h3>
+    <dl>
+      <dt><kbd>1</kbd>–<kbd>9</kbd></dt><dd style="margin:0">Open a site</dd>
+      <dt><kbd>a</kbd>–<kbd>z</kbd></dt><dd style="margin:0">Filter sites, <kbd>Enter</kbd> opens the first match</dd>
+      <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd style="margin:0">Open the match in a new tab</dd>
+      <dt><kbd>Space</kbd></dt><dd style="margin:0">Next photo</dd>
+      <dt><kbd>.</kbd></dt><dd style="margin:0">Focus mode (hide cards)</dd>
+      <dt><kbd>,</kbd></dt><dd style="margin:0">Settings</dd>
+      <dt><kbd>Esc</kbd></dt><dd style="margin:0">Close / clear filter</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="toast panel" id="toast" hidden><span id="toastMsg"></span><button class="btn" id="toastUndo">Undo</button></div>
+
+</body>
+</html>

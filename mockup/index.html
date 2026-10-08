@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.unsplash.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@200;300;600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed photo canvas; clock in the open upper area; link dock + three glass cards in the lower third.
+   Single dark-glass look on purpose: the photo supplies the color, the accent is re-derived per photo. */
+:root {
+  color-scheme: dark;
+  --accent: #e86fa0;           /* replaced per photo */
+  --base: #c3adbb;             /* photo's average color, shown before it loads */
+  --ink: #f7f5f2;
+  --ink-2: rgba(247, 245, 242, .74);
+  --ink-3: rgba(247, 245, 242, .52);
+  --glass: rgba(12, 14, 20, .46);
+  --glass-strong: rgba(12, 14, 20, .82);
+  --line: rgba(255, 255, 255, .14);
+  --up: #1d8a55;
+  --down: #c8372f;
+  --live: #ff4b4b;
+  --warn: #f0b429;
+  --ok: #3ddc84;
+  --f-display: 'Big Shoulders Display', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --f-body: 'Instrument Sans', system-ui, 'Segoe UI', sans-serif;
+  --r-card: 14px;
+  --gutter: clamp(16px, 4vw, 56px);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: #101216;
+  color: var(--ink);
+  font: 15px/1.4 var(--f-body);
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ---------- background ---------- */
+.bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: var(--base); transition: background .6s; }
+.bg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.bg .lq { filter: blur(28px); transform: scale(1.12); }
+.bg .hq { opacity: 0; transition: opacity .6s ease; }
+.bg .hq.on { opacity: 1; }
+.bg .scrim {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,.42) 0%, rgba(0,0,0,0) 30%),
+    linear-gradient(to top, rgba(0,0,0,.62) 0%, rgba(0,0,0,.2) 42%, rgba(0,0,0,0) 62%);
+}
+
+/* ---------- stage ---------- */
+.stage {
+  position: relative; z-index: 1;
+  min-height: 100%;
+  display: flex; flex-direction: column;
+  padding-inline: var(--gutter);
+  padding-block: 18px 14px;
+  gap: 14px;
+}
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.iconbtn {
+  width: 36px; height: 36px; display: grid; place-items: center;
+  border-radius: 10px; border: 1px solid transparent; background: transparent;
+  color: var(--ink-2); transition: background .15s, color .15s, border-color .15s;
+}
+.iconbtn:hover { background: var(--glass); border-color: var(--line); color: var(--ink); }
+.iconbtn svg { width: 18px; height: 18px; }
+.iconbtn.on { color: var(--accent); }
+.photo-ctl { display: flex; align-items: center; gap: 4px; opacity: .7; transition: opacity .2s; }
+.photo-ctl:hover, .photo-ctl:focus-within { opacity: 1; }
+.kw-chips { display: flex; gap: 6px; margin-right: 6px; }
+.kw-chip {
+  border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(10px);
+  border-radius: 999px; padding: 4px 11px; font-size: 13px; color: var(--ink);
+}
+.kw-chip:hover { border-color: var(--accent); }
+.kw-chip b { color: var(--accent); font-weight: 600; }
+
+.hero { flex: 1; display: flex; flex-direction: column; justify-content: center; padding-block: 2vh; min-height: 200px; }
+.clock {
+  font: 200 clamp(5rem, 11vw, 10.5rem)/.86 var(--f-display);
+  letter-spacing: -.01em; margin: 0;
+  text-shadow: 0 2px 30px rgba(0,0,0,.25);
+}
+.clock .ampm { font-size: .28em; font-weight: 300; letter-spacing: .06em; margin-left: .25em; vertical-align: .9em; color: var(--ink-2); }
+.dateline { text-shadow: 0 1px 12px rgba(0,0,0,.55); margin: .9rem 0 0 .25rem; font-size: clamp(1rem, 1.4vw, 1.25rem); color: var(--ink-2); }
+.dateline strong { color: var(--ink); font-weight: 500; }
+.wx { margin: 1.1rem 0 0; align-self: flex-start; max-width: 100%; padding: 10px 18px 10px 14px; border-radius: 16px; background: rgba(12,14,20,.32); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.12); display: flex; align-items: center; gap: 14px 22px; flex-wrap: wrap; text-shadow: 0 1px 12px rgba(0,0,0,.55); }
+.wx-now { display: flex; align-items: center; gap: 12px; }
+.wx-now svg { width: 40px; height: 40px; flex: none; filter: drop-shadow(0 1px 8px rgba(0,0,0,.35)); }
+.wx-temp { font: 300 2.7rem/1 var(--f-display); }
+.wx-desc { font-size: 13.5px; color: var(--ink-2); line-height: 1.4; }
+.wx-desc strong { display: block; color: var(--ink); font-weight: 500; font-size: 15px; }
+.wx-hours { display: flex; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,.25); }
+.wx-h { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 50px; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.wx-h svg { width: 22px; height: 22px; }
+.wx-h b { color: var(--ink); font-weight: 600; font-size: 13.5px; }
+.wx-h .pp { color: #9dd6ff; font-size: 11px; min-height: 13px; }
+.wx.loading { opacity: .5; }
+.wx:empty { display: none; }
+
+/* ---------- dock ---------- */
+.dock {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--glass); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--line); border-radius: 16px;
+  padding: 6px; overflow-x: auto; scrollbar-width: none;
+}
+.dock::-webkit-scrollbar { display: none; }
+.filter {
+  flex: none; display: flex; align-items: center; gap: 6px;
+  padding: 0 12px; height: 42px; border-right: 1px solid var(--line); margin-right: 4px;
+  color: var(--accent); font-weight: 600; min-width: 90px;
+}
+.filter::after { content: ''; width: 2px; height: 18px; background: var(--accent); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.tile {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  height: 42px; padding: 0 14px 0 10px; border-radius: 11px;
+  color: var(--ink); text-decoration: none; white-space: nowrap;
+  transition: background .15s, opacity .15s;
+}
+.tile:hover, .tile.match-first { background: rgba(255,255,255,.1); }
+.tile.dim { opacity: .28; }
+.mono {
+  width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  font: 700 14px/1 var(--f-display); letter-spacing: .02em;
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  position: relative;
+}
+.dot { position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid #15171c; background: var(--ok); }
+.dot.warn { background: var(--warn); }
+.dot.down { background: var(--live); }
+.tile .key { font-size: 11px; color: var(--ink-3); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; line-height: 16px; }
+.tile .name { font-weight: 500; }
+
+/* ---------- cards ---------- */
+.cards {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
+  transition: opacity .3s ease, transform .3s ease;
+}
+.cards.hide { opacity: 0; transform: translateY(14px); pointer-events: none; }
+.card {
+  background: var(--glass); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--line); border-radius: var(--r-card);
+  padding: 14px 16px 12px; min-width: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  animation: rise .5s both;
+}
+.card:nth-child(2) { animation-delay: .06s; }
+.card:nth-child(3) { animation-delay: .12s; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+.card-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.card-h h2 { margin: 0; font: 600 15px/1 var(--f-display); letter-spacing: .14em; text-transform: uppercase; }
+.card-h .meta { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.card-h .meta .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 5px; vertical-align: 1px; }
+.card.stale { opacity: .78; }
+
+/* scores */
+.games { display: flex; flex-direction: column; }
+.game { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 8px 0; border-top: 1px solid var(--line); align-items: center; }
+.game:first-child { border-top: 0; padding-top: 2px; }
+.matchup { display: grid; gap: 3px; min-width: 0; }
+.side { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bar { width: 4px; height: 16px; border-radius: 2px; flex: none; }
+.side .abbr { font: 600 17px/1 var(--f-display); letter-spacing: .04em; width: 3.4em; }
+.side .score { font: 600 18px/1 var(--f-body); margin-left: auto; font-variant-numeric: tabular-nums; }
+.side.lose { color: var(--ink-3); }
+.status { text-align: right; font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
+.status .big { display: block; color: var(--ink); font-weight: 600; font-size: 13.5px; }
+.tag { display: inline-block; font: 600 10.5px/1 var(--f-body); letter-spacing: .08em; padding: 3px 6px; border-radius: 5px; background: rgba(255,255,255,.1); color: var(--ink-2); vertical-align: 1px; }
+.livetag { color: #fff; background: var(--live); }
+.livetag::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #fff; margin-right: 5px; vertical-align: 1px; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.wl { display: inline-block; font: 700 11px/1 var(--f-body); padding: 3px 6px; border-radius: 5px; color: #fff; }
+.wl.w { background: var(--up); } .wl.l { background: var(--down); }
+.game.quiet { grid-template-columns: 1fr; color: var(--ink-3); font-size: 13px; }
+.game.quiet .side .abbr { color: var(--ink-2); }
+.more { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--accent); font-size: 13px; }
+
+/* stocks */
+.quotes { display: flex; flex-direction: column; }
+.quote { display: grid; grid-template-columns: minmax(0, 1fr) 96px auto; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.quote:first-child { border-top: 0; padding-top: 2px; }
+.sym { font: 600 18px/1 var(--f-display); letter-spacing: .05em; }
+.sub { display: block; font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+.px { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.chip { display: inline-block; min-width: 64px; text-align: center; margin-top: 4px; font: 600 12px/1 var(--f-body); font-variant-numeric: tabular-nums; padding: 4px 6px; border-radius: 6px; color: #fff; }
+.chip.up { background: var(--up); } .chip.down { background: var(--down); }
+.spark { width: 96px; height: 34px; display: block; overflow: visible; }
+.idx { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 2px; }
+.idx span { font-size: 12px; color: var(--ink-2); background: rgba(255,255,255,.07); border-radius: 6px; padding: 3px 7px; font-variant-numeric: tabular-nums; }
+.idx b.up { color: #5fe0a0; font-weight: 600; } .idx b.down { color: #ff8a80; font-weight: 600; }
+
+/* camera */
+.poster { position: relative; display: block; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #000; padding: 0; }
+.poster img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(.85); transition: transform .4s ease; }
+.poster:hover img { transform: scale(1.03); }
+.poster .play { position: absolute; inset: 0; display: grid; place-items: center; background: linear-gradient(to top, rgba(0,0,0,.45), transparent 60%); }
+.poster .play span { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.4); backdrop-filter: blur(6px); transition: background .2s; }
+.poster:hover .play span { background: var(--accent); border-color: transparent; }
+.poster .dur { position: absolute; right: 8px; bottom: 7px; font-size: 12px; background: rgba(0,0,0,.6); padding: 2px 6px; border-radius: 5px; }
+.cam-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 13px; }
+.linkbtn:hover { text-decoration: underline; }
+
+/* footer */
+.foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; color: var(--ink-3); }
+.foot a { color: var(--ink-2); }
+.pill { border: 1px dashed rgba(255,255,255,.3); border-radius: 999px; padding: 3px 10px; }
+.hint kbd { font: inherit; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+
+/* ---------- popover / drawer / overlay shared ---------- */
+.panel { background: var(--glass-strong); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid var(--line); }
+.popover { position: absolute; z-index: 20; top: 58px; right: var(--gutter); width: 300px; border-radius: 14px; padding: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.4); }
+.popover h3, .drawer h3 { margin: 0 0 8px; font: 600 13px/1 var(--f-display); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+
+.kw-edit { display: flex; flex-wrap: wrap; gap: 6px; }
+.kw-tog { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.05); padding: 4px 4px 4px 11px; font-size: 13px; }
+.kw-tog.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.kw-tog button { border: 0; background: none; padding: 0 2px; }
+.kw-tog .x { width: 20px; height: 20px; border-radius: 50%; color: var(--ink-3); }
+.kw-tog .x:hover { color: var(--ink); background: rgba(255,255,255,.12); }
+.addrow { display: flex; gap: 6px; margin-top: 10px; }
+.addrow input, .field {
+  flex: 1; min-width: 0; height: 34px; border-radius: 8px; border: 1px solid var(--line);
+  background: rgba(255,255,255,.06); padding: 0 10px;
+}
+.btn { height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.08); font-size: 13px; font-weight: 500; }
+.btn:hover { background: rgba(255,255,255,.14); }
+.btn.primary { background: var(--accent); border-color: transparent; color: #111; }
+.note { font-size: 12px; color: var(--ink-3); margin: 8px 0 0; }
+
+.drawer {
+  position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(440px, 100%);
+  display: flex; flex-direction: column; border-width: 0 0 0 1px;
+  transform: translateX(100%); transition: transform .3s ease; visibility: hidden;
+}
+.drawer.open { transform: none; visibility: visible; }
+.drawer-h { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px 20px; }
+.drawer-h h2 { margin: 0; font: 600 22px/1 var(--f-display); letter-spacing: .04em; }
+.tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tabs button { flex: none; background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 9px; font-size: 13px; color: var(--ink-2); }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabpanel { flex: 1; overflow-y: auto; padding: 18px 20px 30px; display: flex; flex-direction: column; gap: 22px; }
+.list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.li { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; border-top: 1px solid var(--line); min-height: 44px; }
+.li:first-child { border-top: 0; }
+.li .grow { flex: 1; min-width: 0; }
+.li .grow small { display: block; color: var(--ink-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.li .mini { width: 28px; height: 28px; border-radius: 7px; border: 0; background: none; color: var(--ink-3); display: grid; place-items: center; }
+.li .mini:hover:not(:disabled) { background: rgba(255,255,255,.1); color: var(--ink); }
+.li .mini:disabled { opacity: .25; cursor: default; }
+.li .mini svg { width: 15px; height: 15px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; padding: 2px; gap: 2px; }
+.seg button { border: 0; background: none; border-radius: 7px; padding: 5px 11px; font-size: 13px; color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: rgba(255,255,255,.14); color: var(--ink); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+.switch { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: rgba(255,255,255,.18); position: relative; cursor: pointer; flex: none; transition: background .2s; }
+.switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(16px); }
+.teamdot { width: 10px; height: 22px; border-radius: 3px; flex: none; }
+
+/* theater */
+.theater { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(4,5,8,.78); backdrop-filter: blur(10px); padding: 24px var(--gutter); }
+.theater-box { width: min(1120px, 100%); display: flex; flex-direction: column; gap: 12px; }
+.theater-h { display: flex; align-items: center; gap: 10px; }
+.theater-h h2 { margin: 0; font: 600 22px/1 var(--f-display); letter-spacing: .04em; }
+.theater-h .sp { flex: 1; }
+.theater video { width: 100%; max-height: 66vh; border-radius: 12px; background: #000; display: block; }
+.theater-c { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); }
+.strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.thumb { flex: none; width: 168px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: #000; padding: 0; text-align: left; }
+.thumb img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; opacity: .8; }
+.thumb span { display: block; padding: 6px 8px; font-size: 12px; background: var(--glass-strong); }
+.thumb[aria-current="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.thumb[aria-current="true"] img { opacity: 1; }
+
+.toast { position: fixed; z-index: 50; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 9px 10px 9px 16px; border-radius: 12px; font-size: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.4); }
+.keys { position: fixed; z-index: 45; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.5); }
+.keys .panel { border-radius: 16px; padding: 20px 24px; width: min(380px, calc(100% - 32px)); }
+.keys dl { display: grid; grid-template-columns: auto 1fr; gap: 9px 16px; margin: 0; font-size: 14px; }
+.keys dt { text-align: right; }
+.keys kbd { font: 600 12px/1 var(--f-body); border: 1px solid var(--line); background: rgba(255,255,255,.08); border-radius: 5px; padding: 3px 6px; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 1100px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cards > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .wx { align-self: stretch; }
+  .wx-hours { padding-left: 0; border-left: 0; width: 100%; justify-content: space-between; }
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  .kw-chips { display: none; }
+  .hero { min-height: 34vh; }
+  .hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg" id="bg">
+  <img class="lq" id="bgLq" alt="">
+  <img class="hq" id="bgHq" alt="">
+  <div class="scrim"></div>
+</div>
+
+<div class="stage">
+  <div class="topbar">
+    <button class="iconbtn" id="openSettings" title="Settings  ( , )" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+    <div class="photo-ctl">
+      <div class="kw-chips" id="kwChips"></div>
+      <button class="iconbtn" id="nextPhoto" title="Next photo  (Space)" aria-label="Next photo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg>
+      </button>
+      <button class="iconbtn" id="favPhoto" title="Keep this photo in rotation" aria-label="Favorite photo" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>
+      </button>
+      <button class="iconbtn" id="banPhoto" title="Never show this photo again" aria-label="Never show this photo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <section class="hero">
+    <h1 class="clock tnum" id="clock">9:41</h1>
+    <p class="dateline" id="dateline"></p>
+    <div class="wx" id="wx"></div>
+  </section>
+
+  <nav class="dock" id="dock" aria-label="My sites"></nav>
+
+  <section class="cards" id="cards"></section>
+
+  <footer class="foot">
+    <span class="pill" title="Scores, quotes and status dots are sample data. Photos and camera footage are real.">Mockup · sample data</span>
+    <span class="hint"><kbd>?</kbd> shortcuts</span>
+    <span id="credit"></span>
+  </footer>
+</div>
+
+<div class="popover panel" id="kwPop" hidden>
+  <h3>Photo keywords</h3>
+  <div class="kw-edit" id="kwPopList"></div>
+  <form class="addrow" id="kwPopAdd"><input id="kwPopInput" placeholder="Add a keyword" aria-label="Add a keyword"><button class="btn">Add</button></form>
+  <p class="note">Each load picks one active keyword at random.</p>
+</div>
+
+<aside class="drawer panel" id="drawer" aria-label="Settings">
+  <div class="drawer-h">
+    <h2>Settings</h2>
+    <button class="iconbtn" id="closeSettings" aria-label="Close settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="tabpanel" id="tabpanel" role="tabpanel"></div>
+</aside>
+
+<div class="theater" id="theater" hidden>
+  <div class="theater-box">
+    <div class="theater-h">
+      <h2 id="theaterTitle">Driveway</h2>
+      <span class="sp"></span>
+      <button class="iconbtn" id="closeTheater" aria-label="Close player  (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <video id="video" controls muted playsinline preload="none"></video>
+    <div class="theater-c">
+      <span id="clipLabel"></span>
+      <div class="seg" id="speed" aria-label="Playback speed">
+        <button aria-pressed="true" data-r="1">1×</button><button aria-pressed="false" data-r="2">2×</button><button aria-pressed="false" data-r="4">4×</button>
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<div class="keys" id="keys" hidden>
+  <div class="panel">
+    <h3 style="margin:0 0 14px;font:600 13px/1 var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)">Shortcuts</h3>
+    <dl>
+      <dt><kbd>1</kbd>–<kbd>9</kbd></dt><dd style="margin:0">Open a site</dd>
+      <dt><kbd>a</kbd>–<kbd>z</kbd></dt><dd style="margin:0">Filter sites, <kbd>Enter</kbd> opens the first match</dd>
+      <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd style="margin:0">Open the match in a new tab</dd>
+      <dt><kbd>Space</kbd></dt><dd style="margin:0">Next photo</dd>
+      <dt><kbd>.</kbd></dt><dd style="margin:0">Focus mode (hide cards)</dd>
+      <dt><kbd>,</kbd></dt><dd style="margin:0">Settings</dd>
+      <dt><kbd>Esc</kbd></dt><dd style="margin:0">Close / clear filter</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="toast panel" id="toast" hidden><span id="toastMsg"></span><button class="btn" id="toastUndo">Undo</button></div>
+
+<script>
+/* ================= data ================= */
+const PHOTOS = {
+  spring: [
+    { id: '1462275646964-a0e3386b89fa', base: '#c3adbb', accent: '#ef6fa6' },
+    { id: '1468327768560-75b778cbb551', base: '#a2999c', accent: '#e8475f' },
+    { id: '1490750967868-88aa4486c946', base: '#75906f', accent: '#f7a823' },
+    { id: '1522383225653-ed111181a951', base: '#d9b2bc', accent: '#f08bb4' },
+    { id: '1441974231531-c6227db76b6e', base: '#545038', accent: '#9ccc52' },
+    { id: '1470252649378-9c29740c9fa8', base: '#805935', accent: '#f59b3d' },
+    { id: '1491147334573-44cbb4602074', base: '#3f604e', accent: '#45c08f' },
+  ],
+  mountains: [
+    { id: '1464822759023-fed622ff2c3b', base: '#6d7f8c', accent: '#6fb6f5' },
+    { id: '1506744038136-46273834b3fb', base: '#8a97a1', accent: '#f4a27e' },
+    { id: '1500530855697-b586d89ba3ee', base: '#8a5a48', accent: '#ec7d4f' },
+    { id: '1516298773066-c48f8e9bd92b', base: '#6b4a3a', accent: '#f6a747' },
+    { id: '1469474968028-56623f02e42e', base: '#6f7350', accent: '#b4d65a' },
+  ],
+};
+const ALL_PHOTOS = Object.values(PHOTOS).flat();
+
+const TEAMS = {
+  // color = a mark that reads on dark glass (navy/black primaries swapped for their light secondaries)
+  NFL: [
+    { id: 'bears', name: 'Chicago Bears', abbr: 'CHI', color: '#e8692c' },
+    { id: 'packers', name: 'Green Bay Packers', abbr: 'GB', color: '#ffb612' },
+    { id: 'lions', name: 'Detroit Lions', abbr: 'DET', color: '#4fa8e0' },
+    { id: 'vikings', name: 'Minnesota Vikings', abbr: 'MIN', color: '#a77fd6' },
+    { id: 'chiefs', name: 'Kansas City Chiefs', abbr: 'KC', color: '#e31837' },
+    { id: 'commanders', name: 'Washington Commanders', abbr: 'WAS', color: '#ffb612' },
+  ],
+  NBA: [
+    { id: 'bulls', name: 'Chicago Bulls', abbr: 'CHI', color: '#e2203d' },
+    { id: 'bucks', name: 'Milwaukee Bucks', abbr: 'MIL', color: '#4fae5a' },
+    { id: 'celtics', name: 'Boston Celtics', abbr: 'BOS', color: '#2fa45a' },
+    { id: 'knicks', name: 'New York Knicks', abbr: 'NYK', color: '#f58426' },
+    { id: 'nuggets', name: 'Denver Nuggets', abbr: 'DEN', color: '#fec524' },
+    { id: 'lakers', name: 'Los Angeles Lakers', abbr: 'LAL', color: '#a97fd8' },
+  ],
+  NCAAB: [
+    { id: 'depaul', name: 'DePaul Blue Demons', abbr: 'DEP', color: '#4f8fe0' },
+    { id: 'loyola', name: 'Loyola Chicago Ramblers', abbr: 'LUC', color: '#d14b5a' },
+    { id: 'illinois', name: 'Illinois Fighting Illini', abbr: 'ILL', color: '#ff6a2c' },
+    { id: 'northwestern', name: 'Northwestern Wildcats', abbr: 'NU', color: '#9b6fd6' },
+    { id: 'uconn', name: 'UConn Huskies', abbr: 'UConn', color: '#6aa0e8' },
+    { id: 'marquette', name: 'Marquette Golden Eagles', abbr: 'MU', color: '#ffcc00' },
+  ],
+  MLB: [
+    { id: 'cubs', name: 'Chicago Cubs', abbr: 'CHC', color: '#3a6fe0' },
+    { id: 'whitesox', name: 'Chicago White Sox', abbr: 'CWS', color: '#c4ced4' },
+    { id: 'brewers', name: 'Milwaukee Brewers', abbr: 'MIL', color: '#ffc52f' },
+    { id: 'cardinals', name: 'St. Louis Cardinals', abbr: 'STL', color: '#e0334a' },
+    { id: 'dodgers', name: 'Los Angeles Dodgers', abbr: 'LAD', color: '#4c8be0' },
+    { id: 'yankees', name: 'New York Yankees', abbr: 'NYY', color: '#c4ced4' },
+  ],
+};
+const teamById = id => { for (const [lg, list] of Object.entries(TEAMS)) { const t = list.find(x => x.id === id); if (t) return { ...t, league: lg }; } };
+const opp = (abbr, color) => ({ abbr, color });
+
+// Sample game states keyed by team. rank: 0 live, 1 later today, 2 final <24h, 3 next scheduled, 4 nothing soon
+const GAMES = {
+  cubs:     { rank: 0, state: 'live',  note: 'NLDS · Game 3', home: opp('MIL', '#ffc52f'), hs: 2, away: null, as: 4, period: 'Bot 6th', tv: 'TBS' },
+  bulls:    { rank: 2, state: 'final', note: 'Preseason · last night', home: opp('DEN', '#fec524'), hs: 108, as: 112 },
+  bears:    { rank: 3, state: 'next',  note: 'Week 6', when: 'Mon 7:15 PM', tv: 'ESPN', vs: opp('WAS', '#ffb612'), at: true },
+  whitesox: { rank: 4, state: 'off',   text: 'Offseason · Opening Day Mar 26' },
+};
+function gameFor(team) {
+  if (GAMES[team.id]) return GAMES[team.id];
+  const fallback = {
+    NFL:   { rank: 3, state: 'next', note: 'Week 6', when: 'Sun 12:00 PM', tv: 'FOX', vs: opp('TBD', '#888') },
+    NBA:   { rank: 3, state: 'next', note: 'Preseason', when: 'Fri 7:00 PM', tv: 'NBA TV', vs: opp('TBD', '#888') },
+    NCAAB: { rank: 4, state: 'off',  text: 'Season opens Mon, Nov 2' },
+    MLB:   { rank: 4, state: 'off',  text: 'Offseason' },
+  };
+  return fallback[team.league];
+}
+
+const STOCK_SAMPLE = {
+  AMZN:  { name: 'Amazon.com Inc.', price: 221.37, chg: 1.84 },
+  VOO:   { name: 'Vanguard S&P 500 ETF', price: 548.12, chg: -1.15 },
+  VBIAX: { name: 'Vanguard Balanced Index Admiral', price: 49.86, chg: 0.15 },
+};
+const isFund = s => /^[A-Z]{4}X$/.test(s);
+
+const yesterday = () => new Date(Date.now() - 864e5).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+const SUMMARY = { src: 'assets/summary.mp4', img: 'assets/poster.jpg', dur: '0:14' };
+
+const DEFAULTS = {
+  keywords: [{ name: 'spring', on: true }],
+  favs: [], banned: [], favMix: 0,
+  links: [
+    { name: 'Pulse', url: 'http://synology:3004/pulse/', status: 'ok' },
+    { name: 'Quest', url: 'http://synology:3006', status: 'ok' },
+    { name: 'Trakt', url: 'http://synology:3001/trakt', status: 'ok' },
+    { name: 'Travel', url: 'http://synology:3003/travel', status: 'ok' },
+    { name: 'Vault', url: 'http://synology:3010/vault', status: 'ok' },
+    { name: 'DevDash', url: 'http://synology:3005', status: 'ok' },
+    { name: 'NodeCast', url: 'http://synology:3011', status: 'warn' },
+  ],
+  teams: ['cubs', 'whitesox', 'bulls', 'bears'],
+  tickers: ['VBIAX', 'VOO', 'AMZN'],
+  showIndexes: true,
+  wxLoc: { name: 'Chicago, Illinois', lat: 41.88, lon: -87.63 },
+  wxUnit: 'F',
+  wxHourly: true,
+  cards: [{ id: 'scores', on: true }, { id: 'stocks', on: true }, { id: 'camera', on: true }],
+  focus: false,
+  lastPhoto: null,
+};
+
+/* ================= state ================= */
+const KEY = 'portal-mockup-v1';
+let S;
+try { S = { ...structuredClone(DEFAULTS), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { S = structuredClone(DEFAULTS); }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
+
+let undoSnap = null, toastTimer;
+function change(msg, fn) {
+  undoSnap = JSON.stringify(S);
+  fn(); save(); renderAll();
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.hidden = false; clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.hidden = true, 5000);
+}
+document.getElementById('toastUndo').onclick = () => {
+  if (!undoSnap) return;
+  S = JSON.parse(undoSnap); undoSnap = null; save(); renderAll();
+  document.getElementById('toast').hidden = true;
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function rng(seedStr) { let h = 1779033703; for (const c of seedStr) h = Math.imul(h ^ c.charCodeAt(0), 3432918353); return () => { h = Math.imul(h ^ h >>> 16, 2246822507); h = Math.imul(h ^ h >>> 13, 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; }; }
+
+/* ================= photo ================= */
+let current = null, preloaded = null;
+function pickPhoto() {
+  const active = S.keywords.filter(k => k.on);
+  const kw = active.length ? active[Math.floor(Math.random() * active.length)].name : 'spring';
+  if (S.favs.length && S.favMix && Math.random() < S.favMix) {
+    const f = ALL_PHOTOS.filter(p => S.favs.includes(p.id) && p.id !== current?.id);
+    if (f.length) return { ...f[Math.floor(Math.random() * f.length)], kw: 'favorite' };
+  }
+  let pool = (PHOTOS[kw.toLowerCase()] || ALL_PHOTOS).filter(p => !S.banned.includes(p.id) && p.id !== (current?.id || S.lastPhoto));
+  if (!pool.length) pool = ALL_PHOTOS.filter(p => !S.banned.includes(p.id));
+  if (!pool.length) return null;
+  return { ...pool[Math.floor(Math.random() * pool.length)], kw };
+}
+const photoUrl = (id, w) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`;
+const screenW = () => Math.min(2560, Math.ceil(innerWidth * (devicePixelRatio || 1) / 400) * 400);
+
+function showPhoto(p) {
+  if (!p) { document.documentElement.style.setProperty('--accent', '#e86fa0'); return; }
+  current = p; S.lastPhoto = p.id; save();
+  const root = document.documentElement.style;
+  root.setProperty('--base', p.base); root.setProperty('--accent', p.accent);
+  const hq = $('bgHq'); hq.classList.remove('on');
+  $('bgLq').src = photoUrl(p.id, 40);
+  const img = new Image();
+  img.onload = () => { hq.src = img.src; requestAnimationFrame(() => hq.classList.add('on')); preloadNext(); };
+  img.src = photoUrl(p.id, screenW());
+  $('credit').innerHTML = `#${esc(p.kw)} · <a href="https://unsplash.com/?utm_source=portal&utm_medium=referral">Photo on Unsplash</a>`;
+  const fav = S.favs.includes(p.id);
+  $('favPhoto').classList.toggle('on', fav); $('favPhoto').setAttribute('aria-pressed', fav);
+}
+function preloadNext() { preloaded = pickPhoto(); if (preloaded) new Image().src = photoUrl(preloaded.id, screenW()); }
+function nextPhoto() { const p = preloaded || pickPhoto(); preloaded = null; showPhoto(p); }
+$('nextPhoto').onclick = nextPhoto;
+$('favPhoto').onclick = () => {
+  if (!current) return;
+  const on = S.favs.includes(current.id);
+  change(on ? 'Removed from favorites' : 'Saved to favorites', () => {
+    S.favs = on ? S.favs.filter(x => x !== current.id) : [...S.favs, current.id];
+  });
+  $('favPhoto').classList.toggle('on', !on);
+};
+$('banPhoto').onclick = () => {
+  if (!current) return;
+  const id = current.id;
+  change('Photo hidden for good', () => { S.banned = [...S.banned, id]; });
+  nextPhoto();
+};
+
+/* ================= clock ================= */
+function tick() {
+  const d = new Date();
+  let h = d.getHours(); const m = String(d.getMinutes()).padStart(2, '0');
+  const ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12;
+  $('clock').innerHTML = `${h}:${m}<span class="ampm">${ap}</span>`;
+  const g = d.getHours() < 12 ? 'Good morning' : d.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  $('dateline').innerHTML = `<strong>${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</strong> · ${g}`;
+}
+
+/* ================= keywords ================= */
+function renderKeywords() {
+  $('kwChips').innerHTML = S.keywords.filter(k => k.on).map(k => `<button class="kw-chip" data-kw><b>#</b>${esc(k.name)}</button>`).join('')
+    || `<button class="kw-chip" data-kw>+ keyword</button>`;
+  const editor = S.keywords.map((k, i) => `<span class="kw-tog ${k.on ? 'on' : ''}"><button data-tog="${i}" aria-pressed="${k.on}">#${esc(k.name)}</button><button class="x" data-del="${i}" aria-label="Remove ${esc(k.name)}">×</button></span>`).join('');
+  $('kwPopList').innerHTML = editor || '<span class="note">No keywords. Add one.</span>';
+  return editor;
+}
+function kwHandlers(container) {
+  container.addEventListener('click', e => {
+    const t = e.target.closest('[data-tog]'), d = e.target.closest('[data-del]');
+    if (t) { const k = S.keywords[+t.dataset.tog]; change(`#${k.name} ${k.on ? 'paused' : 'on'}`, () => k.on = !k.on); }
+    if (d) { const k = S.keywords[+d.dataset.del]; change(`Removed #${k.name}`, () => S.keywords.splice(+d.dataset.del, 1)); }
+  });
+}
+function addKeyword(v) {
+  v = v.trim().toLowerCase(); if (!v || S.keywords.some(k => k.name === v)) return;
+  change(`Added #${v}`, () => S.keywords.push({ name: v, on: true }));
+}
+kwHandlers($('kwPopList'));
+$('kwPopAdd').onsubmit = e => { e.preventDefault(); addKeyword($('kwPopInput').value); $('kwPopInput').value = ''; };
+$('kwChips').addEventListener('click', e => { if (e.target.closest('[data-kw]')) { $('kwPop').hidden = !$('kwPop').hidden; if (!$('kwPop').hidden) $('kwPopInput').focus(); } });
+document.addEventListener('click', e => { if (!$('kwPop').hidden && !e.target.closest('#kwPop, [data-kw]')) $('kwPop').hidden = true; });
+
+/* ================= dock ================= */
+let filterText = '';
+function monogram(n) { return n.slice(0, 1).toUpperCase(); }
+function renderDock() {
+  const q = filterText.toLowerCase();
+  let firstMatch = -1;
+  const tiles = S.links.map((l, i) => {
+    const hit = !q || l.name.toLowerCase().includes(q);
+    if (hit && firstMatch < 0 && q) firstMatch = i;
+    return `<a class="tile ${q && !hit ? 'dim' : ''} ${i === firstMatch ? 'match-first' : ''}" href="${esc(l.url)}" data-i="${i}">
+      <span class="mono">${esc(monogram(l.name))}<i class="dot ${l.status === 'warn' ? 'warn' : l.status === 'down' ? 'down' : ''}" title="${l.status === 'warn' ? 'Slow to respond (sample)' : 'Healthy (sample)'}"></i></span>
+      <span class="name">${esc(l.name)}</span>${i < 9 ? `<span class="key">${i + 1}</span>` : ''}</a>`;
+  }).join('');
+  $('dock').innerHTML = (q ? `<span class="filter">${esc(filterText)}</span>` : '') + tiles;
+  return firstMatch;
+}
+function openLink(i, newTab) { const l = S.links[i]; if (!l) return; newTab ? window.open(l.url, '_blank') : (location.href = l.url); }
+
+/* ================= cards ================= */
+function sideHtml(abbr, color, score, lose) {
+  return `<div class="side ${lose ? 'lose' : ''}"><i class="bar" style="background:${color}"></i><span class="abbr">${esc(abbr)}</span>${score != null ? `<span class="score">${score}</span>` : ''}</div>`;
+}
+let scoresExpanded = false;
+function scoresCard() {
+  const rows = S.teams.map(teamById).filter(Boolean).map(t => ({ t, g: gameFor(t) })).sort((a, b) => a.g.rank - b.g.rank);
+  const shown = scoresExpanded ? rows : rows.slice(0, 4);
+  const html = shown.map(({ t, g }) => {
+    if (g.state === 'off') return `<div class="game quiet">${sideHtml(t.abbr, t.color)}<span style="margin-left:20px">${esc(g.text)}</span></div>`;
+    if (g.state === 'next') {
+      return `<div class="game"><div class="matchup">${sideHtml(t.abbr, t.color)}${sideHtml((g.at ? '@ ' : 'vs ') + g.vs.abbr, g.vs.color)}</div>
+        <div class="status"><span class="tag">${t.league}</span> <span class="big">${esc(g.when)}</span>${esc(g.tv)} · ${esc(g.note)}</div></div>`;
+    }
+    const mine = g.as, theirs = g.hs, win = mine > theirs;
+    const top = sideHtml(t.abbr, t.color, mine, g.state === 'final' && !win);
+    const bottom = sideHtml(g.home.abbr, g.home.color, theirs, g.state === 'final' && win);
+    const status = g.state === 'live'
+      ? `<span class="tag livetag">LIVE</span> <span class="big">${esc(g.period)}</span>${esc(g.tv)} · ${esc(g.note)}`
+      : `<span class="tag">${t.league}</span> <span class="wl ${win ? 'w' : 'l'}">${win ? 'W' : 'L'}</span><span class="big">Final</span>${esc(g.note)}`;
+    return `<div class="game"><div class="matchup">${top}${bottom}</div><div class="status">${g.state === 'live' ? '<span class="tag">' + t.league + '</span> ' : ''}${status}</div></div>`;
+  }).join('') || `<div class="game quiet">No teams followed. Add some in Settings → Sports.</div>`;
+  const more = rows.length > 4 ? `<button class="more" data-more>${scoresExpanded ? 'Show less' : `+${rows.length - 4} more`}</button>` : '';
+  const live = rows.filter(r => r.g.state === 'live').length;
+  return `<article class="card"><div class="card-h"><h2>Scores</h2><span class="meta">${live ? `${live} live · ` : ''}${rows.length} teams</span></div><div class="games">${html}</div>${more}</article>`;
+}
+
+function marketState() {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date()).map(x => [x.type, x.value]));
+  const mins = +p.hour * 60 + +p.minute, wkday = !['Sat', 'Sun'].includes(p.weekday);
+  if (wkday && mins >= 510 && mins < 900) return { s: 'open', frac: (mins - 510) / 390 };
+  if (wkday && mins >= 420 && mins < 510) return { s: 'pre', frac: 1 };
+  return { s: 'closed', frac: 1 };
+}
+function series(sym, n, start, end) {
+  const r = rng(sym + n); const pts = [0];
+  for (let i = 1; i < n; i++) pts.push(pts[i - 1] + (r() - .5));
+  const last = pts[n - 1];
+  return pts.map((v, i) => start + (v - last * i / (n - 1)) * Math.abs(end - start || 1) * .5 + (end - start) * i / (n - 1));
+}
+function sparkline(vals, total, base, up) {
+  const W = 96, H = 34, all = [...vals, base], lo = Math.min(...all), hi = Math.max(...all), span = hi - lo || 1;
+  const x = i => (i / (total - 1)) * W, y = v => H - 3 - ((v - lo) / span) * (H - 6);
+  const d = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const c = up ? '#5fe0a0' : '#ff8a80', gid = 'g' + Math.random().toString(36).slice(2, 7);
+  const lx = x(vals.length - 1), ly = y(vals[vals.length - 1]);
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".35"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs>
+    <line x1="0" x2="${W}" y1="${y(base)}" y2="${y(base)}" stroke="rgba(255,255,255,.28)" stroke-dasharray="2 3" stroke-width="1"/>
+    <path d="${d}L${lx},${H}L0,${H}Z" fill="url(#${gid})"/>
+    <path d="${d}" fill="none" stroke="${c}" stroke-width="1.6" stroke-linejoin="round"/>
+    <circle cx="${lx}" cy="${ly}" r="2.6" fill="${c}"/></svg>`;
+}
+function quoteFor(sym) {
+  if (STOCK_SAMPLE[sym]) return STOCK_SAMPLE[sym];
+  const r = rng(sym); const price = +(20 + r() * 380).toFixed(2);
+  return { name: 'Sample quote', price, chg: +((r() - .5) * .06 * price).toFixed(2) };
+}
+function stocksCard() {
+  const m = marketState();
+  const rows = S.tickers.map(sym => {
+    const q = quoteFor(sym), prev = q.price - q.chg, up = q.chg >= 0, pct = (q.chg / prev * 100);
+    const fund = isFund(sym);
+    let spark, sub;
+    if (fund) {
+      spark = sparkline(series(sym, 30, prev * .97, q.price), 30, prev * .97, q.price >= prev * .97);
+      sub = `NAV · Oct 7 · 30-day`;
+    } else {
+      const total = 78, n = Math.max(2, Math.round(total * m.frac));
+      spark = sparkline(series(sym, n, prev, m.s === 'open' ? prev + q.chg * m.frac : q.price), total, prev, up);
+      sub = esc(q.name);
+    }
+    return `<div class="quote"><div style="min-width:0"><span class="sym">${esc(sym)}</span><span class="sub">${sub}</span></div>${spark}
+      <div class="px">${q.price.toFixed(2)}<br><span class="chip ${up ? 'up' : 'down'}">${up ? '+' : '−'}${Math.abs(pct).toFixed(2)}%</span></div></div>`;
+  }).join('') || `<div class="quote" style="grid-template-columns:1fr;color:var(--ink-3)">No tickers. Add some in Settings → Stocks.</div>`;
+  const meta = m.s === 'open' ? `<span class="live-dot"></span>Open · updated ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    : m.s === 'pre' ? 'Pre-market' : 'Closed · as of 3:00 PM CT';
+  const idx = S.showIndexes ? `<div class="idx"><span>S&amp;P <b class="up">+0.42%</b></span><span>Nasdaq <b class="up">+0.61%</b></span><span>Dow <b class="down">−0.08%</b></span></div>` : '';
+  return `<article class="card ${m.s === 'closed' ? 'stale' : ''}"><div class="card-h"><h2>Stocks</h2><span class="meta">${meta}</span></div><div class="quotes">${rows}</div>${idx}</article>`;
+}
+function cameraCard() {
+  return `<article class="card"><div class="card-h"><h2>Camera</h2><span class="meta">Driveway · daily summary</span></div>
+    <button class="poster" data-play aria-label="Play yesterday's daily summary"><img src="${SUMMARY.img}" alt="Driveway camera, ${yesterday()}"><span class="play"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span></span><span class="dur tnum">${SUMMARY.dur}</span></button>
+    <div class="cam-meta"><span>Yesterday · ${yesterday()}</span><span>Replaced each morning</span></div></article>`;
+}
+function renderCards() {
+  const make = { scores: scoresCard, stocks: stocksCard, camera: cameraCard };
+  $('cards').innerHTML = S.cards.filter(c => c.on).map(c => make[c.id]()).join('');
+  $('cards').classList.toggle('hide', S.focus);
+}
+$('cards').addEventListener('click', e => {
+  if (e.target.closest('[data-play]')) openTheater();
+  if (e.target.closest('[data-more]')) { scoresExpanded = !scoresExpanded; renderCards(); }
+});
+
+/* ================= theater ================= */
+function openTheater() {
+  $('theater').hidden = false; $('kwPop').hidden = true;
+  $('theaterTitle').textContent = `Driveway · ${yesterday()}`;
+  const v = $('video'); v.src = SUMMARY.src; v.poster = SUMMARY.img;
+  v.playbackRate = +document.querySelector('#speed [aria-pressed="true"]').dataset.r;
+  v.play().catch(() => {});
+  $('clipLabel').textContent = 'Daily summary · the mockup uses one of today\'s motion clips as a stand-in';
+  $('closeTheater').focus();
+}
+$('speed').addEventListener('click', e => {
+  const b = e.target.closest('[data-r]'); if (!b) return;
+  [...$('speed').children].forEach(x => x.setAttribute('aria-pressed', x === b));
+  $('video').playbackRate = +b.dataset.r;
+});
+function closeTheater() { $('video').pause(); $('theater').hidden = true; }
+$('closeTheater').onclick = closeTheater;
+$('theater').addEventListener('click', e => { if (e.target === $('theater')) closeTheater(); });
+
+/* ================= settings ================= */
+const ICON = {
+  up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 15l6-6 6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+};
+const TABS = ['Background', 'Weather', 'Links', 'Sports', 'Stocks', 'Camera', 'Layout'];
+let tab = 'Background', sportsLeague = 'NFL', teamQuery = '';
+function moveBtns(kind, i, len) {
+  return `<button class="mini" data-act="up" data-kind="${kind}" data-i="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Move up">${ICON.up}</button>
+          <button class="mini" data-act="down" data-kind="${kind}" data-i="${i}" ${i === len - 1 ? 'disabled' : ''} aria-label="Move down">${ICON.down}</button>`;
+}
+function renderSettings() {
+  $('tabs').innerHTML = TABS.map(t => `<button role="tab" aria-selected="${t === tab}" data-tab="${t}">${t}</button>`).join('');
+  const P = $('tabpanel');
+  if (tab === 'Background') {
+    const favs = S.favs.length, banned = S.banned;
+    P.innerHTML = `<section><h3>Keywords</h3><div class="kw-edit" id="kwDrawerList">${renderKeywords()}</div>
+      <form class="addrow" id="kwDrawerAdd"><input id="kwDrawerInput" placeholder="Add a keyword, e.g. mountains" aria-label="Add a keyword"><button class="btn">Add</button></form>
+      <p class="note">Each load picks one active keyword at random. Tap a keyword to pause it. This mockup only has photos for #spring and #mountains.</p></section>
+      <section><h3>Favorites</h3><div class="row"><span>${favs} saved · mix them back in</span>
+        <div class="seg" id="favMix">${[[0, 'Never'], [.1, '1 in 10'], [.25, '1 in 4']].map(([v, l]) => `<button data-v="${v}" aria-pressed="${S.favMix === v}">${l}</button>`).join('')}</div></div></section>
+      <section><h3>Hidden photos</h3>${banned.length ? `<div class="list">${banned.map((id, i) => `<div class="li"><img src="${photoUrl(id, 120)}" alt="" style="width:56px;height:34px;object-fit:cover;border-radius:5px"><span class="grow"><small>${id.slice(0, 13)}…</small></span><button class="btn" data-unban="${i}">Show again</button></div>`).join('')}</div>` : '<p class="note" style="margin:0">None. Use ⊘ on a photo you never want to see again.</p>'}</section>`;
+    kwHandlers($('kwDrawerList'));
+    $('kwDrawerAdd').onsubmit = e => { e.preventDefault(); addKeyword($('kwDrawerInput').value); setTimeout(() => $('kwDrawerInput')?.focus()); };
+    $('favMix').onclick = e => { const b = e.target.closest('[data-v]'); if (b) change('Favorites mix updated', () => S.favMix = +b.dataset.v); };
+    P.querySelectorAll('[data-unban]').forEach(b => b.onclick = () => change('Photo back in rotation', () => S.banned.splice(+b.dataset.unban, 1)));
+  }
+  if (tab === 'Links') {
+    P.innerHTML = `<section><h3>Sites · order sets the 1–9 keys</h3><div class="list">${S.links.map((l, i) => `<div class="li"><span class="mono" style="flex:none">${esc(monogram(l.name))}</span>
+        <span class="grow">${esc(l.name)}<small>${esc(l.url)}</small></span>${moveBtns('links', i, S.links.length)}
+        <button class="mini" data-act="del" data-kind="links" data-i="${i}" aria-label="Remove ${esc(l.name)}">${ICON.x}</button></div>`).join('')}</div></section>
+      <section><h3>Add a site</h3><form id="linkAdd" style="display:grid;gap:8px"><input class="field" id="linkName" placeholder="Name" required><input class="field" id="linkUrl" placeholder="https://" required><button class="btn primary" style="justify-self:start">Add site</button></form>
+      <p class="note">Status dots come from DevDash health checks for NAS apps. External sites don't get a dot.</p></section>`;
+    $('linkAdd').onsubmit = e => { e.preventDefault(); const n = $('linkName').value.trim(), u = $('linkUrl').value.trim(); change(`Added ${n}`, () => S.links.push({ name: n, url: u, status: 'ok' })); };
+  }
+  if (tab === 'Sports') {
+    const following = S.teams.map(teamById).filter(Boolean);
+    const q = teamQuery.toLowerCase();
+    const pool = TEAMS[sportsLeague].filter(t => !S.teams.includes(t.id) && t.name.toLowerCase().includes(q));
+    P.innerHTML = `<section><h3>Following</h3><div class="list">${following.map(t => `<div class="li"><i class="teamdot" style="background:${t.color}"></i><span class="grow">${esc(t.name)}<small>${t.league}</small></span>
+        <button class="mini" data-act="del" data-kind="teams" data-i="${S.teams.indexOf(t.id)}" aria-label="Unfollow ${esc(t.name)}">${ICON.x}</button></div>`).join('') || '<div class="li"><span class="grow note" style="margin:0">Not following anyone yet.</span></div>'}</div></section>
+      <section><h3>Add teams</h3><div class="seg" id="leagues" style="margin-bottom:10px">${Object.keys(TEAMS).map(l => `<button data-l="${l}" aria-pressed="${l === sportsLeague}">${l}</button>`).join('')}</div>
+        <input class="field" id="teamSearch" placeholder="Search ${sportsLeague} teams" value="${esc(teamQuery)}" style="width:100%;margin-bottom:8px">
+        <div class="list">${pool.map(t => `<div class="li"><i class="teamdot" style="background:${t.color}"></i><span class="grow">${esc(t.name)}</span><button class="mini" data-follow="${t.id}" aria-label="Follow ${esc(t.name)}">${ICON.plus}</button></div>`).join('') || '<div class="li"><span class="grow note" style="margin:0">No more matches in this sample list.</span></div>'}</div>
+        <p class="note">Card order is automatic: live games, then later today, then finals from the last 24 hours, then next scheduled.</p></section>`;
+    $('leagues').onclick = e => { const b = e.target.closest('[data-l]'); if (b) { sportsLeague = b.dataset.l; teamQuery = ''; renderSettings(); } };
+    $('teamSearch').oninput = e => { teamQuery = e.target.value; renderSettings(); const el = $('teamSearch'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); };
+    P.querySelectorAll('[data-follow]').forEach(b => b.onclick = () => { const t = teamById(b.dataset.follow); change(`Following ${t.name}`, () => S.teams.push(t.id)); });
+  }
+  if (tab === 'Stocks') {
+    P.innerHTML = `<section><h3>Watchlist</h3><div class="list">${S.tickers.map((s, i) => `<div class="li"><span class="grow"><b style="font:600 16px var(--f-display);letter-spacing:.05em">${esc(s)}</b><small>${isFund(s) ? 'Mutual fund · daily NAV' : esc(quoteFor(s).name)}</small></span>
+        ${moveBtns('tickers', i, S.tickers.length)}<button class="mini" data-act="del" data-kind="tickers" data-i="${i}" aria-label="Remove ${esc(s)}">${ICON.x}</button></div>`).join('')}</div>
+      <form class="addrow" id="tickAdd"><input id="tickInput" placeholder="Symbol, e.g. MSFT" aria-label="Add a symbol" style="text-transform:uppercase"><button class="btn">Add</button></form>
+      <p class="note">The live version checks the symbol and shows the company name before adding it.</p></section>
+      <section><div class="row"><span>Show S&amp;P, Nasdaq and Dow row</span><input type="checkbox" class="switch" id="idxSw" ${S.showIndexes ? 'checked' : ''}></div></section>`;
+    $('tickAdd').onsubmit = e => { e.preventDefault(); const s = $('tickInput').value.trim().toUpperCase(); if (s && !S.tickers.includes(s)) change(`Added ${s}`, () => S.tickers.push(s)); };
+    $('idxSw').onchange = e => change(e.target.checked ? 'Index row on' : 'Index row off', () => S.showIndexes = e.target.checked);
+  }
+  if (tab === 'Weather') {
+    P.innerHTML = `<section><h3>Location</h3><div class="row"><span>${esc(S.wxLoc.name)}</span></div>
+      <form class="addrow" id="wxFind"><input id="wxQuery" placeholder="Search a city or town" aria-label="Search a city or town"><button class="btn">Search</button></form>
+      <div class="list" id="wxResults" style="margin-top:8px" hidden></div></section>
+      <section><div class="row"><span>Units</span><div class="seg" id="wxUnit">${['F', 'C'].map(u => `<button data-u="${u}" aria-pressed="${S.wxUnit === u}">°${u}</button>`).join('')}</div></div></section>
+      <section><div class="row"><span>Show the next 12 hours</span><input type="checkbox" class="switch" id="wxHourSw" ${S.wxHourly ? 'checked' : ''}></div>
+      <p class="note">Forecast from Open-Meteo, the same source as the Weather app.</p></section>`;
+    $('wxFind').onsubmit = async e => {
+      e.preventDefault(); const q = $('wxQuery').value.trim(); if (!q) return;
+      const box = $('wxResults'); box.hidden = false; box.innerHTML = '<div class="li"><span class="grow note" style="margin:0">Searching…</span></div>';
+      try {
+        const r = await (await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en`)).json();
+        box.innerHTML = (r.results || []).map((g, i) => `<button class="li" style="background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;width:100%" data-g="${i}"><span class="grow">${esc(g.name)}<small>${esc([g.admin1, g.country].filter(Boolean).join(', '))}</small></span></button>`).join('')
+          || '<div class="li"><span class="grow note" style="margin:0">No places match that name.</span></div>';
+        box.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { const g = r.results[+b.dataset.g];
+          change(`Weather set to ${g.name}`, () => S.wxLoc = { name: [g.name, g.admin1].filter(Boolean).join(', '), lat: g.latitude, lon: g.longitude }); loadWeather(true); });
+      } catch { box.innerHTML = '<div class="li"><span class="grow note" style="margin:0">Search is unavailable right now. Try again in a minute.</span></div>'; }
+    };
+    $('wxUnit').onclick = e => { const b = e.target.closest('[data-u]'); if (b && b.dataset.u !== S.wxUnit) { change(`Showing °${b.dataset.u}`, () => S.wxUnit = b.dataset.u); loadWeather(true); } };
+    $('wxHourSw').onchange = e => { change(e.target.checked ? 'Hourly forecast on' : 'Hourly forecast off', () => S.wxHourly = e.target.checked); renderWeather(); };
+  }
+  if (tab === 'Camera') {
+    P.innerHTML = `<section><h3>Default camera</h3><select class="field" id="camSel" style="width:100%"><option>Driveway</option></select>
+      <p class="note">A picker appears in the player once there's more than one camera.</p></section>
+      <section><h3>What shows</h3><p class="note" style="margin:0">Always yesterday's daily summary. Portal keeps one converted copy and replaces it when the next day's summary lands. The original recordings on the NAS are never touched.</p></section>`;
+  }
+  if (tab === 'Layout') {
+    const label = { scores: 'Scores', stocks: 'Stocks', camera: 'Camera' };
+    P.innerHTML = `<section><h3>Cards · left to right</h3><div class="list">${S.cards.map((c, i) => `<div class="li"><span class="grow">${label[c.id]}</span>${moveBtns('cards', i, S.cards.length)}
+        <input type="checkbox" class="switch" data-card="${i}" ${c.on ? 'checked' : ''} aria-label="Show ${label[c.id]}"></div>`).join('')}</div></section>
+      <section><div class="row"><span>Focus mode: photo, clock and sites only<br><small class="note">Shortcut: <kbd>.</kbd></small></span><input type="checkbox" class="switch" id="focusSw" ${S.focus ? 'checked' : ''}></div></section>`;
+    P.querySelectorAll('[data-card]').forEach(sw => sw.onchange = () => { const c = S.cards[+sw.dataset.card]; change(`${label[c.id]} ${sw.checked ? 'shown' : 'hidden'}`, () => c.on = sw.checked); });
+    $('focusSw').onchange = e => change(e.target.checked ? 'Focus mode on' : 'Focus mode off', () => S.focus = e.target.checked);
+  }
+}
+$('tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) { tab = b.dataset.tab; renderSettings(); } };
+$('tabpanel').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const arr = S[b.dataset.kind], i = +b.dataset.i;
+  if (b.dataset.act === 'del') {
+    const nm = b.dataset.kind === 'teams' ? teamById(arr[i]).name : (arr[i].name || arr[i]);
+    change(`Removed ${nm}`, () => arr.splice(i, 1));
+  } else {
+    const j = b.dataset.act === 'up' ? i - 1 : i + 1;
+    change('Order updated', () => [arr[i], arr[j]] = [arr[j], arr[i]]);
+  }
+});
+function openSettings() { $('drawer').classList.add('open'); $('kwPop').hidden = true; renderSettings(); setTimeout(() => $('tabs').querySelector('[aria-selected="true"]').focus(), 50); }
+function closeSettings() { $('drawer').classList.remove('open'); $('openSettings').focus(); }
+$('openSettings').onclick = openSettings;
+$('closeSettings').onclick = closeSettings;
+
+/* ================= weather ================= */
+const WX = c => c === 0 ? ['Clear', 'sun'] : c <= 2 ? ['Partly cloudy', 'part'] : c === 3 ? ['Overcast', 'cloud']
+  : c <= 48 ? ['Fog', 'fog'] : c <= 57 ? ['Drizzle', 'rain'] : c <= 67 ? ['Rain', 'rain'] : c <= 77 ? ['Snow', 'snow']
+  : c <= 82 ? ['Showers', 'rain'] : c <= 86 ? ['Snow showers', 'snow'] : ['Thunderstorms', 'storm'];
+function wxIcon(code, day = 1) {
+  const k = WX(code)[1], sun = '#ffd36b', cl = '#f2f4f7', rn = '#9dd6ff';
+  const cloud = (dx = 0, dy = 0, f = cl) => `<path transform="translate(${dx} ${dy})" d="M9 21h12a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 10 12a4.5 4.5 0 0 0-1 9z" fill="${f}"/>`;
+  const orb = (cx, cy, r) => day
+    ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${sun}"/><g stroke="${sun}" stroke-width="1.6" stroke-linecap="round">${[0, 45, 90, 135, 180, 225, 270, 315].map(a => { const t = a * Math.PI / 180; return `<line x1="${(cx + Math.cos(t) * (r + 2.5)).toFixed(2)}" y1="${(cy + Math.sin(t) * (r + 2.5)).toFixed(2)}" x2="${(cx + Math.cos(t) * (r + 4.5)).toFixed(2)}" y2="${(cy + Math.sin(t) * (r + 4.5)).toFixed(2)}"/>`; }).join('')}</g>`
+    : `<path d="M${cx + 2} ${cy - r}a${r} ${r} 0 1 0 ${r - 1} ${r + 4}a${r - 1} ${r - 1} 0 0 1 -${r - 1} -${r + 4}z" fill="#e8e2c8"/>`;
+  const drops = `<g stroke="${rn}" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="23" x2="10.5" y2="27"/><line x1="17" y1="23" x2="15.5" y2="27"/><line x1="22" y1="23" x2="20.5" y2="27"/></g>`;
+  const body = {
+    sun: orb(16, 16, 6.5),
+    part: orb(12, 11, 5) + cloud(2, 4),
+    cloud: cloud(-3, -2, '#b9c0ca') + cloud(2, 3),
+    fog: `<g stroke="${cl}" stroke-width="2" stroke-linecap="round"><line x1="6" y1="12" x2="26" y2="12"/><line x1="4" y1="17" x2="24" y2="17"/><line x1="8" y1="22" x2="28" y2="22"/></g>`,
+    rain: cloud(0, -2) + drops,
+    snow: cloud(0, -2) + `<g fill="${cl}"><circle cx="11" cy="25" r="1.4"/><circle cx="16.5" cy="27" r="1.4"/><circle cx="22" cy="25" r="1.4"/></g>`,
+    storm: cloud(0, -2) + `<path d="M17 21l-4 5h4l-2 4 6-6h-4l2-3z" fill="${sun}"/>`,
+  }[k];
+  return `<svg viewBox="0 0 32 32" aria-hidden="true">${body}</svg>`;
+}
+let wxData = null;
+try { wxData = JSON.parse(localStorage.getItem('portal-mockup-wx') || 'null'); } catch {}
+function renderWeather() {
+  const el = $('wx');
+  if (!wxData) { el.innerHTML = ''; return; }
+  const { current: c, daily: d, hourly: h } = wxData, u = '°';
+  const [desc] = WX(c.weather_code);
+  const now = Date.now();
+  let start = h.time.findIndex(t => new Date(t).getTime() > now);
+  if (start < 0) start = 0;
+  const hours = [];
+  for (let i = start; hours.length < 6 && i < h.time.length; i += 2) hours.push(i);
+  const fmtH = t => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric' });
+  const rain = d.precipitation_probability_max[0];
+  el.classList.remove('loading');
+  el.innerHTML = `<div class="wx-now" title="${esc(S.wxLoc.name)}">${wxIcon(c.weather_code, c.is_day)}<span class="wx-temp">${Math.round(c.temperature_2m)}${u}</span>
+      <span class="wx-desc"><strong>${desc}</strong>H ${Math.round(d.temperature_2m_max[0])}${u} · L ${Math.round(d.temperature_2m_min[0])}${u}${rain >= 20 ? ` · ${rain}% rain` : ''}</span></div>
+    ${S.wxHourly ? `<div class="wx-hours">${hours.map(i => `<div class="wx-h"><span>${fmtH(h.time[i])}</span>${wxIcon(h.weather_code[i], h.is_day[i])}<b>${Math.round(h.temperature_2m[i])}${u}</b><span class="pp">${h.precipitation_probability[i] >= 20 ? h.precipitation_probability[i] + '%' : ''}</span></div>`).join('')}</div>` : ''}`;
+}
+async function loadWeather(force) {
+  const key = `${S.wxLoc.lat},${S.wxLoc.lon},${S.wxUnit}`;
+  const stale = force === true || !wxData || wxData.key !== key || Date.now() - (wxData.fetched || 0) > 15 * 60e3;
+  if (!stale) return;
+  if (force === true) $('wx').classList.add('loading');
+  const { lat, lon } = S.wxLoc, unit = S.wxUnit === 'F' ? '&temperature_unit=fahrenheit' : '';
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,weather_code,precipitation_probability,is_day&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=2&timezone=auto${unit}`);
+    if (!r.ok) throw new Error(r.status);
+    wxData = { ...(await r.json()), fetched: Date.now(), key };
+    try { localStorage.setItem('portal-mockup-wx', JSON.stringify(wxData)); } catch {}
+  } catch { $('wx').classList.remove('loading'); return; }  // keep showing the cached forecast
+  renderWeather();
+}
+
+/* ================= keyboard ================= */
+document.addEventListener('keydown', e => {
+  const typing = e.target.matches('input, textarea, select');
+  if (e.key === 'Escape') {
+    if (!$('keys').hidden) return void ($('keys').hidden = true);
+    if (!$('theater').hidden) return closeTheater();
+    if ($('drawer').classList.contains('open')) return closeSettings();
+    if (!$('kwPop').hidden) return void ($('kwPop').hidden = true);
+    if (filterText) { filterText = ''; renderDock(); }
+    return;
+  }
+  if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!$('theater').hidden || $('drawer').classList.contains('open') || !$('kwPop').hidden) return;
+  if (!$('keys').hidden) { $('keys').hidden = true; }
+  if (/^[1-9]$/.test(e.key)) { e.preventDefault(); return openLink(+e.key - 1, e.shiftKey); }
+  if (e.key === '?') { e.preventDefault(); $('keys').hidden = false; return; }
+  if (/^[a-z]$/i.test(e.key)) { e.preventDefault(); filterText += e.key; renderDock(); return; }
+  if (e.key === 'Backspace' && filterText) { e.preventDefault(); filterText = filterText.slice(0, -1); renderDock(); return; }
+  if (e.key === 'Enter' && filterText) { e.preventDefault(); const i = renderDock(); if (i >= 0) openLink(i, e.shiftKey); return; }
+  if (filterText) return;
+  if (e.key === ' ' && !e.target.closest('button, a')) { e.preventDefault(); nextPhoto(); }
+  if (e.key === '.') { S.focus = !S.focus; save(); renderCards(); }
+  if (e.key === ',') { e.preventDefault(); openSettings(); }
+});
+$('keys').onclick = () => $('keys').hidden = true;
+
+/* ================= boot ================= */
+function renderAll() {
+  renderKeywords(); renderDock(); renderCards();
+  if ($('drawer').classList.contains('open')) renderSettings();
+}
+renderAll(); tick(); setInterval(tick, 1000);
+renderWeather(); loadWeather(); setInterval(loadWeather, 5 * 60e3);
+showPhoto(pickPhoto());
+</script>
+</body>
+</html>
