@@ -755,7 +755,15 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (!$('theater').hidden || $('drawer').classList.contains('open')) return;
+  if (!$('theater').hidden && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    // ±10s, or ±30s with Shift. Handled here so it works whatever has focus in the theater.
+    e.preventDefault();
+    const v = $('video');
+    const step = (e.shiftKey ? 30 : 10) * (e.key === 'ArrowLeft' ? -1 : 1);
+    v.currentTime = Math.max(0, Math.min(v.duration || Infinity, v.currentTime + step));
+    return;
+  }
+  if (!$('theater').hidden ||$('drawer').classList.contains('open')) return;
   if (!$('keys').hidden) $('keys').hidden = true;
   if (/^[1-9]$/.test(e.key)) { e.preventDefault(); openLink(+e.key - 1, e.shiftKey); return; }
   if (e.key === '?') { e.preventDefault(); $('keys').hidden = false; return; }

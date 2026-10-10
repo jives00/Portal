@@ -26,7 +26,12 @@ export interface CameraState {
   video: string;
   poster: string;
   duration: number;
+  /** FORMAT the copy was made with; an older copy is re-converted */
+  format?: number;
 }
+
+/** Bump when the conversion changes so the current copy is redone. 2: keeps audio. */
+const FORMAT = 2;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const isoDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -131,7 +136,7 @@ export class CameraService {
       this.lastError = `Can't read the camera folder: ${(err as Error).message}`;
       return;
     }
-    if (!latest || latest.path === this.state?.source) return;
+    if (!latest || (latest.path === this.state?.source && this.state?.format === FORMAT)) return;
 
     this.busy = true;
     this.log.info(`Converting daily summary ${latest.path}`);
@@ -169,9 +174,9 @@ export class CameraService {
     const encode =
       codec === 'h264' && width <= 1920
         ? ['-c', 'copy']
-        : ['-vf', "scale='min(1920,iw)':-2", '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p'];
+        : ['-vf', "scale='min(1920,iw)':-2", '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k'];
     // nice keeps the conversion from starving the NAS's other containers; it's a 4-core Atom.
-    const ffmpeg = ['ffmpeg', '-v', 'error', '-y', '-i', src.path, ...encode, '-an', '-movflags', '+faststart', '-f', 'mp4', tmp];
+    const ffmpeg = ['ffmpeg', '-v', 'error', '-y', '-i', src.path, ...encode, '-movflags', '+faststart', '-f', 'mp4', tmp];
     await (process.platform === 'win32' ? run(ffmpeg[0], ffmpeg.slice(1)) : run('nice', ['-n', '15', ...ffmpeg]));
     fs.renameSync(tmp, path.join(this.outDir, video));
 
@@ -181,7 +186,7 @@ export class CameraService {
       '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '4', path.join(this.outDir, poster),
     ]);
 
-    return { source: src.path, date: src.date, video, poster, duration };
+    return { source: src.path, date: src.date, video, poster, duration, format: FORMAT };
   }
 
   /** Keep only the current copy: one video, one poster, and the state file. */
