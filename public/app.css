@@ -1,4 +1,4 @@
-/* Layout: full-bleed photo canvas; clock in the open upper area; link dock + three glass cards in the lower third.
+/* Layout: full-bleed photo canvas; clock, date and weather pinned top-left; link dock + three glass cards in the lower third.
    Single dark-glass look on purpose: the photo supplies the color, the accent is re-derived per photo. */
 :root {
   color-scheme: dark;
@@ -59,7 +59,7 @@ button { cursor: pointer; }
   padding-block: 18px 14px;
   gap: 14px;
 }
-.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: absolute; z-index: 2; top: 18px; right: var(--gutter); }
 .iconbtn {
   width: 36px; height: 36px; display: grid; place-items: center;
   border-radius: 10px; border: 1px solid transparent; background: transparent;
@@ -72,7 +72,7 @@ button { cursor: pointer; }
 .photo-ctl .sep { width: 1px; height: 18px; background: var(--line); margin-inline: 4px; }
 .photo-ctl:hover, .photo-ctl:focus-within { opacity: 1; }
 
-.hero { flex: 1; display: flex; flex-direction: column; justify-content: center; padding-block: 2vh; min-height: 200px; }
+.hero { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; padding-block: 0 2vh; min-height: 200px; }
 .clock {
   font: 200 clamp(5rem, 11vw, 10.5rem)/.86 var(--f-display);
   letter-spacing: -.01em; margin: 0;
@@ -294,6 +294,7 @@ button { cursor: pointer; }
   .wx-hours { padding-left: 0; border-left: 0; width: 100%; justify-content: space-between; }
   .cards { grid-template-columns: minmax(0, 1fr); }
   .scroll { flex: none; min-height: 0; max-height: 60vh; }
+  .topbar { position: static; }
   .hero { min-height: 34vh; }
   .hint { display: none; }
 }
