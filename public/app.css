@@ -153,8 +153,9 @@ button { cursor: pointer; }
 .card-h .meta .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 5px; vertical-align: 1px; }
 .card.stale { opacity: .78; }
 
+/* The longer of Scores/Stocks sets the row height (capped, then it scrolls); the camera poster stretches to match. */
 .scroll {
-  flex: 1 1 0; min-height: 230px; overflow-y: auto; overflow-x: hidden;
+  flex: 0 1 auto; min-height: 0; max-height: 48vh; overflow-y: auto; overflow-x: hidden;
   margin-inline: -6px; padding-inline: 6px;
   scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.22) transparent;
 }
@@ -204,6 +205,11 @@ button { cursor: pointer; }
 .cam-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
 .linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 13px; }
 .linkbtn:hover { text-decoration: underline; }
+
+@media (min-width: 1101px) {
+  .cards:has(.scroll) .poster { flex: 1 1 0; min-height: 150px; aspect-ratio: auto; }
+  .cards:has(.scroll) .poster img { position: absolute; inset: 0; }
+}
 
 /* footer */
 .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; color: var(--ink-3); }
