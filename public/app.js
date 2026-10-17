@@ -412,7 +412,7 @@ function openTheater() {
   $('theaterTitle').textContent = `${S?.camera.label || 'Camera'} · ${dayLabel(cam.date)}`;
   const v = $('video');
   if (!v.src.endsWith(cam.video)) { v.src = cam.video; v.poster = cam.poster; }
-  v.playbackRate = +document.querySelector('#speed [aria-pressed="true"]').dataset.r;
+  v.defaultPlaybackRate = v.playbackRate = +document.querySelector('#speed [aria-pressed="true"]').dataset.r;
   v.play().catch(() => {});
   $('clipLabel').textContent = `Daily summary · ${fmtDur(cam.duration)}`;
   $('closeTheater').focus();
@@ -421,7 +421,7 @@ $('speed').addEventListener('click', (e) => {
   const b = e.target.closest('[data-r]');
   if (!b) return;
   [...$('speed').children].forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  $('video').playbackRate = +b.dataset.r;
+  $('video').defaultPlaybackRate = $('video').playbackRate = +b.dataset.r;
 });
 function closeTheater() { $('video').pause(); $('theater').hidden = true; }
 $('closeTheater').onclick = closeTheater;
