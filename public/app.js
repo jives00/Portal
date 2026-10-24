@@ -314,6 +314,7 @@ function scoresCard() {
 }
 
 /* ================= stocks ================= */
+let sparkN = 0; // gradient ids count up per render, so unchanged data renders identical HTML
 function sparkline(points, base, up, x0, x1) {
   const W = 96, H = 34;
   if (points.length < 2) return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true"></svg>`;
@@ -323,7 +324,7 @@ function sparkline(points, base, up, x0, x1) {
   const y = (v) => H - 3 - ((v - lo) / span) * (H - 6);
   const d = points.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
   const c = up ? '#5fe0a0' : '#ff8a80';
-  const gid = `g${Math.random().toString(36).slice(2, 8)}`;
+  const gid = `spark${sparkN++}`;
   const last = points[points.length - 1], lx = x(last.t).toFixed(1), ly = y(last.v).toFixed(1);
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true">
     <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".35"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs>
@@ -356,6 +357,7 @@ function quoteRow(q) {
     <div class="px">${money(q.price)}<span class="chg ${up ? 'up' : 'down'}">${sign}${money(Math.abs(q.change))}<span class="chip ${up ? 'up' : 'down'}">${sign}${Math.abs(q.changePct).toFixed(2)}%</span></span></div></a>`;
 }
 function stocksCard() {
+  sparkN = 0;
   const data = cached('quotes');
   if (!data) return `<article class="card"><div class="card-h"><h2>Stocks</h2></div>${moduleFailed.quotes ? '<p class="empty">Quotes are unavailable right now.</p>' : skeleton(3)}</article>`;
   const rows = data.quotes.map(quoteRow).join('') || '<p class="empty">Your watchlist is empty. Add symbols in Settings → Stocks.</p>';
@@ -394,11 +396,35 @@ function cameraCard() {
 }
 
 /* ================= cards ================= */
+/*
+ * Refreshes swap only the card whose HTML changed, in place, keeping its list's scroll position.
+ * Rebuilding the whole row replayed the entrance animation and reloaded the poster on every poll.
+ */
+const cardHtml = {};
 function renderCards() {
-  if (!S) { $('cards').innerHTML = scoresCard() + stocksCard() + cameraCard(); return; }
+  const box = $('cards');
   const make = { scores: scoresCard, stocks: stocksCard, camera: cameraCard };
-  $('cards').innerHTML = S.cards.filter((c) => c.on).map((c) => make[c.id]()).join('');
-  $('cards').classList.toggle('hide', local.focus);
+  const ids = S ? S.cards.filter((c) => c.on).map((c) => c.id) : ['scores', 'stocks', 'camera'];
+  [...box.children].forEach((el) => { if (!ids.includes(el.dataset.card)) el.remove(); });
+  ids.forEach((id, i) => {
+    const html = make[id]();
+    let el = box.querySelector(`:scope > [data-card="${id}"]`);
+    if (!el || cardHtml[id] !== html) {
+      const t = document.createElement('template');
+      t.innerHTML = html;
+      const fresh = t.content.firstElementChild;
+      fresh.dataset.card = id;
+      const top = el?.querySelector('.scroll')?.scrollTop;
+      if (el) el.replaceWith(fresh); else box.append(fresh);
+      if (top) { const s = fresh.querySelector('.scroll'); if (s) s.scrollTop = top; }
+      el = fresh;
+      cardHtml[id] = html;
+    }
+    if (box.children[i] !== el) box.insertBefore(el, box.children[i]);
+  });
+  box.classList.toggle('hide', local.focus);
+  // The rise-in animation is for the first paint only.
+  if (!box.dataset.settled) { box.dataset.settled = '1'; setTimeout(() => box.classList.add('settled'), 800); }
 }
 $('cards').addEventListener('click', (e) => {
   if (e.target.closest('[data-play]')) openTheater();

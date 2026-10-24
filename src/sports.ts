@@ -179,7 +179,15 @@ function scoreboard(league: League, day: string, ttlMs: number): Promise<GameEve
 function teamNext(league: League, id: string): Promise<GameEvent | undefined> {
   return nextCache.get(`${league}:${id}`, async () => {
     const d = await getJson<any>(`${ESPN}/${PATHS[league].api}/teams/${id}`);
-    return normalizeEvent(d?.team?.nextEvent?.[0], league) ?? undefined;
+    const next = normalizeEvent(d?.team?.nextEvent?.[0], league) ?? undefined;
+    if (next && next.state !== 'post') return next;
+    // nextEvent lags: it keeps pointing at the last final for days (e.g. into a bye week), so read the schedule.
+    const s = await getJson<any>(`${ESPN}/${PATHS[league].api}/teams/${id}/schedule`).catch(() => null);
+    const upcoming = ((s?.events ?? []) as any[])
+      .map((e) => normalizeEvent(e, league))
+      .filter((e): e is GameEvent => Boolean(e && e.state !== 'post'))
+      .sort((a, b) => a.date - b.date)[0];
+    return upcoming ?? next;
   });
 }
 
