@@ -179,6 +179,17 @@ function playClip(ev, force = false) {
   renderControls();
 }
 
+/** The next event after `cur` among the cameras showing, skipping clips this browser can't play. */
+function nextClip(cur) {
+  let next = null;
+  for (const e of eventsShown()) {
+    if (isShare(e.file) && !hevcOk) continue;
+    const after = e.t > cur.t || (e.t === cur.t && e.file > cur.file);
+    if (after && (!next || e.t < next.t || (e.t === next.t && e.file < next.file))) next = e;
+  }
+  return next;
+}
+
 function hevcNotice(ev) {
   showNotice(`<p>This browser can't play the Reolink's 4K HEVC clips.<br><small>Edge, Safari, and Chrome with hardware video decoding can.</small></p>
     <p><button class="btn" data-act="force">Try anyway</button> ${C.summary?.video ? '<button class="btn" data-act="yesterday">Watch Yesterday</button>' : ''} <button class="btn" data-act="back">Back to timeline</button></p>`);
@@ -557,6 +568,12 @@ function wire() {
 
   const v = $('camVideo');
   v.addEventListener('timeupdate', () => { if (C.mode === 'clip' && C.clip) setCursor(C.clip.t + v.currentTime); });
+  // Clips play on through the rest of the day, oldest to newest, like a playlist.
+  v.addEventListener('ended', () => {
+    if (C.mode !== 'clip' || !C.clip) return;
+    const next = nextClip(C.clip);
+    if (next) playClip(next);
+  });
   v.addEventListener('play', renderControls);
   v.addEventListener('pause', renderControls);
   v.addEventListener('volumechange', () => { prefs.muted = v.muted; savePrefs(); });

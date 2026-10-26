@@ -384,7 +384,8 @@ const cardHtml = {};
 function renderCards() {
   const box = $('cards');
   const make = { scores: scoresCard, stocks: stocksCard, weather: weatherCard };
-  const ids = S ? S.cards.filter((c) => c.on).map((c) => c.id) : ['scores', 'stocks', 'weather'];
+  // Settings cached by an older version can name a card that no longer exists (the old camera card).
+  const ids = (S ? S.cards.filter((c) => c.on).map((c) => c.id) : ['scores', 'stocks', 'weather']).filter((id) => make[id]);
   [...box.children].forEach((el) => { if (!ids.includes(el.dataset.card)) el.remove(); });
   ids.forEach((id, i) => {
     const html = make[id]();
