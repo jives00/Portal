@@ -14,7 +14,7 @@ export const PhotoSchema = z.object({
 });
 export type Photo = z.infer<typeof PhotoSchema>;
 
-const CardId = z.enum(['scores', 'stocks', 'camera']);
+const CardId = z.enum(['scores', 'stocks', 'weather']);
 
 export const SettingsSchema = z.object({
   keywords: z.array(z.object({ name: z.string().trim().min(1).max(40), on: z.boolean() })).max(30),
@@ -32,7 +32,6 @@ export const SettingsSchema = z.object({
     unit: z.enum(['F', 'C']),
     hourly: z.boolean(),
   }),
-  camera: z.object({ label: z.string().trim().max(40) }),
   cards: z
     .array(z.object({ id: CardId, on: z.boolean() }))
     .length(3)
@@ -64,22 +63,27 @@ export const DEFAULTS: Settings = {
   tickers: ['VBIAX', 'VOO', 'AMZN'],
   showLinks: true,
   weather: { name: 'Chicago, Illinois', lat: 41.88, lon: -87.63, unit: 'F', hourly: true },
-  camera: { label: 'Driveway' },
   cards: [
     { id: 'scores', on: true },
     { id: 'stocks', on: true },
-    { id: 'camera', on: true },
+    { id: 'weather', on: true },
   ],
 };
 
 const OLD_INDEX_ROW = ['^GSPC', '^IXIC', '^DJI'];
 
-/** Older files had a separate S&P/Nasdaq/Dow row (`showIndexes`). Indexes are now watchlist rows. */
+/**
+ * Older files had a separate S&P/Nasdaq/Dow row (`showIndexes`); indexes are now watchlist rows.
+ * They also had a camera card, which moved to the Cameras tab; the weather card took its slot.
+ */
 export function migrate(raw: Record<string, unknown>): Record<string, unknown> {
-  const { showIndexes, ...rest } = raw;
+  const { showIndexes, camera: _camera, ...rest } = raw;
   if (showIndexes === true && Array.isArray(rest.tickers)) {
     const tickers = rest.tickers as string[];
     rest.tickers = [...tickers, ...OLD_INDEX_ROW.filter((s) => !tickers.includes(s))].slice(0, 25);
+  }
+  if (Array.isArray(rest.cards)) {
+    rest.cards = (rest.cards as { id: string; on: boolean }[]).map((c) => (c.id === 'camera' ? { ...c, id: 'weather' } : c));
   }
   return rest;
 }

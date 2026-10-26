@@ -2,7 +2,7 @@ import path from 'node:path';
 import fastifyStatic from '@fastify/static';
 import Fastify, { FastifyError } from 'fastify';
 import { ZodError } from 'zod';
-import { CameraService } from './camera';
+import { cameras } from './cameras';
 import { UpstreamError } from './http';
 import { PhotoService } from './photos';
 import { getQuote, getQuotes, resolveSymbol } from './quotes';
@@ -12,7 +12,7 @@ import { linkStatuses } from './status';
 
 const PORT = Number(process.env.PORT ?? 3012);
 const DATA_DIR = path.resolve(process.env.DATA_DIR ?? 'data');
-const CAMERA_ROOT = process.env.CAMERA_ROOT ?? '/cameras';
+const CAMERA_ROOT = path.resolve(process.env.CAMERA_ROOT ?? '/cameras');
 const NAS_HOST = process.env.NAS_HOST ?? '192.168.0.105';
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' } });
@@ -23,19 +23,19 @@ const log = {
 
 const settings = new SettingsStore(path.join(DATA_DIR, 'settings.json'), log);
 const photos = new PhotoService(process.env.UNSPLASH_ACCESS_KEY || undefined, log);
-const camera = new CameraService(CAMERA_ROOT, path.join(DATA_DIR, 'camera'), log);
+const cams = cameras(app, {
+  shareRoot: CAMERA_ROOT,
+  // Ring footage gets its own subfolder, never the share's top-level YYYY/MM/DD (see reolink.ts).
+  footageRoot: path.resolve(process.env.FOOTAGE_ROOT ?? path.join(CAMERA_ROOT, 'Sentry')),
+  dataDir: DATA_DIR,
+  mqttUrl: process.env.MQTT_URL ?? 'mqtt://localhost:1883',
+  rtspBase: process.env.RTSP_BASE ?? 'rtsp://localhost:8554',
+  log,
+});
 
 if (!photos.configured) app.log.warn('UNSPLASH_ACCESS_KEY is not set; using the built-in photo set');
 
 app.register(fastifyStatic, { root: path.join(__dirname, '..', 'public'), prefix: '/' });
-// Converted camera files are named per conversion, so they can be cached for good.
-app.register(fastifyStatic, {
-  root: camera.outDir,
-  prefix: '/media/',
-  decorateReply: false,
-  maxAge: '7d',
-  immutable: true,
-});
 
 app.setErrorHandler((err: FastifyError | Error, _req, reply) => {
   if (err instanceof ZodError) {
@@ -50,7 +50,7 @@ app.setErrorHandler((err: FastifyError | Error, _req, reply) => {
   return reply.status(status).send({ error: err.message });
 });
 
-app.get('/health', async () => ({ ok: true }));
+app.get('/health', async () => ({ ok: true, mqtt: cams.mqtt }));
 
 app.get('/api/settings', async () => settings.get());
 app.put('/api/settings', async (req) => settings.set(req.body));
@@ -76,24 +76,17 @@ app.get<{ Querystring: { league?: string } }>('/api/sports/teams', async (req, r
 
 app.get('/api/status', async () => linkStatuses(settings.get().links.map((l) => l.url), NAS_HOST));
 
-app.get('/api/camera', async () => {
-  const { state, processing, error } = camera.status();
-  const label = settings.get().camera.label;
-  if (!state) return { label, none: true, processing, error };
-  return {
-    label,
-    date: state.date,
-    duration: state.duration,
-    video: `media/${state.video}`,
-    poster: `media/${state.poster}`,
-    processing,
-    error,
-  };
-});
+async function shutdown() {
+  await cams.shutdown();
+  await app.close();
+  process.exit(0);
+}
+process.on('SIGTERM', () => void shutdown());
+process.on('SIGINT', () => void shutdown());
 
 app
   .listen({ port: PORT, host: '0.0.0.0' })
-  .then(() => camera.start())
+  .then(() => cams.start())
   .catch((err) => {
     app.log.error(err);
     process.exit(1);

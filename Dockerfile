@@ -8,7 +8,8 @@ COPY src ./src
 RUN pnpm build && pnpm prune --prod
 
 FROM node:24-alpine
-# ffmpeg converts the camera's 4K HEVC daily summary into browser-friendly H.264.
+# ffmpeg records Ring clips (stream copy), repackages live view as HLS, reads Reolink clip
+# lengths, makes thumbnails, and converts the 4K HEVC daily summary to H.264.
 RUN apk add --no-cache ffmpeg tzdata
 WORKDIR /app
 ENV NODE_ENV=production \

@@ -1,4 +1,5 @@
-/* Layout: full-bleed photo canvas; clock, date and weather pinned top-left; link dock + three glass cards in the lower third.
+/* Layout: full-bleed photo canvas; clock and date pinned top-left; link dock + three glass cards (scores, stocks,
+   weather) in the lower third. The Cameras tab (cameras.js) swaps all of that for its viewer over a dimmed photo.
    Single dark-glass look on purpose: the photo supplies the color, the accent is re-derived per photo. */
 :root {
   color-scheme: dark;
@@ -81,19 +82,25 @@ button { cursor: pointer; }
 .clock .ampm { font-size: .28em; font-weight: 300; letter-spacing: .06em; margin-left: .25em; vertical-align: .9em; color: var(--ink-2); }
 .dateline { text-shadow: 0 1px 12px rgba(0,0,0,.55); margin: .9rem 0 0 .25rem; font-size: clamp(1rem, 1.4vw, 1.25rem); color: var(--ink-2); }
 .dateline strong { color: var(--ink); font-weight: 500; }
-.wx { margin: 1.1rem 0 0; align-self: flex-start; max-width: 100%; padding: 10px 18px 10px 14px; border-radius: 16px; background: rgba(12,14,20,.32); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.12); display: flex; align-items: center; gap: 14px 22px; flex-wrap: wrap; text-shadow: 0 1px 12px rgba(0,0,0,.55); }
+/* weather card */
 .wx-now { display: flex; align-items: center; gap: 12px; }
-.wx-now svg { width: 40px; height: 40px; flex: none; filter: drop-shadow(0 1px 8px rgba(0,0,0,.35)); }
-.wx-temp { font: 300 2.7rem/1 var(--f-display); }
+.wx-now svg { width: 46px; height: 46px; flex: none; filter: drop-shadow(0 1px 8px rgba(0,0,0,.35)); }
+.wx-temp { font: 300 2.9rem/1 var(--f-display); }
 .wx-desc { font-size: 13.5px; color: var(--ink-2); line-height: 1.4; }
 .wx-desc strong { display: block; color: var(--ink); font-weight: 500; font-size: 15px; }
-.wx-hours { display: flex; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,.25); }
-.wx-h { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 50px; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.wx-hours { display: flex; justify-content: space-between; gap: 2px; padding: 8px 0 2px; border-top: 1px solid var(--line); }
+.wx-h { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; flex: 1; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .wx-h svg { width: 22px; height: 22px; }
 .wx-h b { color: var(--ink); font-weight: 600; font-size: 13.5px; }
-.wx-h .pp { color: #9dd6ff; font-size: 11px; min-height: 13px; }
-.wx.loading { opacity: .5; }
-.wx:empty { display: none; }
+.wx-h .pp, .wx-d .pp { color: #9dd6ff; font-size: 11px; min-height: 13px; }
+.wx-days { display: flex; flex-direction: column; border-top: 1px solid var(--line); padding-top: 4px; }
+.wx-d { display: grid; grid-template-columns: 3.2em 26px 2.6em 2.4em minmax(40px, 1fr) 2.4em; align-items: center; gap: 8px; padding: 4px 0; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.wx-d .dn { font-weight: 500; }
+.wx-d svg { width: 24px; height: 24px; }
+.wx-d .lo { color: var(--ink-3); text-align: right; }
+.wx-d .hi { font-weight: 600; }
+.wx-range { position: relative; height: 5px; border-radius: 3px; background: rgba(255,255,255,.1); }
+.wx-range i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, #8fc9ff, #ffd36b); }
 
 /* ---------- dock ---------- */
 .dock {
@@ -154,7 +161,7 @@ button { cursor: pointer; }
 .card-h .meta .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 5px; vertical-align: 1px; }
 .card.stale { opacity: .78; }
 
-/* The longer of Scores/Stocks sets the row height (capped, then it scrolls); the camera poster stretches to match. */
+/* The longer of Scores/Stocks sets the row height (capped, then it scrolls). */
 .scroll {
   flex: 0 1 auto; min-height: 0; max-height: 48vh; overflow-y: auto; overflow-x: hidden;
   margin-inline: -6px; padding-inline: 6px;
@@ -195,22 +202,7 @@ button { cursor: pointer; }
 .chip.up { background: var(--up); } .chip.down { background: var(--down); }
 .spark { width: 96px; height: 34px; display: block; overflow: visible; }
 
-/* camera */
-.poster { position: relative; display: block; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #000; padding: 0; }
-.poster img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(.85); transition: transform .4s ease; }
-.poster:hover img { transform: scale(1.03); }
-.poster .play { position: absolute; inset: 0; display: grid; place-items: center; background: linear-gradient(to top, rgba(0,0,0,.45), transparent 60%); }
-.poster .play span { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.4); backdrop-filter: blur(6px); transition: background .2s; }
-.poster:hover .play span { background: var(--accent); border-color: transparent; }
-.poster .dur { position: absolute; right: 8px; bottom: 7px; font-size: 12px; background: rgba(0,0,0,.6); padding: 2px 6px; border-radius: 5px; }
-.cam-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
-.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 13px; }
-.linkbtn:hover { text-decoration: underline; }
 
-@media (min-width: 1101px) {
-  .cards:has(.scroll) .poster { flex: 1 1 0; min-height: 150px; aspect-ratio: auto; }
-  .cards:has(.scroll) .poster img { position: absolute; inset: 0; }
-}
 
 /* footer */
 .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; color: var(--ink-3); }
@@ -269,14 +261,6 @@ button { cursor: pointer; }
 .switch:checked::after { transform: translateX(16px); }
 .teamdot { width: 10px; height: 22px; border-radius: 3px; flex: none; }
 
-/* theater */
-.theater { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(4,5,8,.78); backdrop-filter: blur(10px); padding: 24px var(--gutter); }
-.theater-box { width: min(1120px, 100%); display: flex; flex-direction: column; gap: 12px; }
-.theater-h { display: flex; align-items: center; gap: 10px; }
-.theater-h h2 { margin: 0; font: 600 22px/1 var(--f-display); letter-spacing: .04em; }
-.theater-h .sp { flex: 1; }
-.theater video { width: 100%; max-height: 66vh; border-radius: 12px; background: #000; display: block; }
-.theater-c { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); }
 
 .toast { position: fixed; z-index: 50; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 9px 10px 9px 16px; border-radius: 12px; font-size: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.4); }
 .keys { position: fixed; z-index: 45; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.5); }
@@ -291,8 +275,6 @@ button { cursor: pointer; }
   .cards > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
 @media (max-width: 700px) {
-  .wx { align-self: stretch; }
-  .wx-hours { padding-left: 0; border-left: 0; width: 100%; justify-content: space-between; }
   .cards { grid-template-columns: minmax(0, 1fr); }
   .scroll { flex: none; min-height: 0; max-height: 60vh; }
   .topbar { position: static; }
@@ -312,6 +294,120 @@ a.game:hover, a.quote:hover { background: rgba(255,255,255,.05); }
 @keyframes shimmer { to { background-position: -200% 0; } }
 .empty { color: var(--ink-3); font-size: 13px; line-height: 1.5; padding: 4px 0; }
 .err { color: #ffb4ab; font-size: 12px; margin: 6px 0 0; }
-.poster.none { display: grid; place-items: center; text-align: center; padding: 16px; color: var(--ink-3); font-size: 13px; cursor: default; }
 .unavail { color: var(--ink-3); font-size: 12px; }
 .li .grow input.field { width: 100%; }
+
+/* ---------- page switcher (Home / Cameras) ---------- */
+.views { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--line); }
+.views a { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 9px; color: var(--ink-2); text-decoration: none; font-size: 13.5px; font-weight: 500; }
+.views a svg { width: 17px; height: 17px; flex: none; }
+.views a:hover { color: var(--ink); background: rgba(255,255,255,.08); }
+.views a[aria-current="page"] { color: var(--ink); background: rgba(255,255,255,.16); }
+
+body[data-view="cameras"] :is(.hero, .dock, .cards, .foot, #nextPhoto, #favPhoto, #banPhoto, .photo-ctl .sep) { display: none !important; }
+body[data-view="cameras"] .photo-ctl { opacity: 1; }
+/* Footage reads better without a busy photo behind it: keep the photo's color, lose its detail. */
+body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturate(.8); transform: scale(1.1); }
+.bg .photo { transition: opacity .2s ease, filter .4s ease; }
+
+/* ---------- cameras ---------- */
+.cams { display: flex; flex-direction: column; gap: 12px; margin-top: 46px; min-width: 0; }
+.cam-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cam-bar .sp { flex: 1; }
+.cam-bar .seg { background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+.cam-day { display: flex; align-items: center; gap: 2px; }
+.cam-day .field { flex: none; color-scheme: dark; background: var(--glass); }
+.cam-day .iconbtn:disabled { opacity: .3; cursor: default; background: none; border-color: transparent; }
+.cam-status { font-size: 12.5px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
+.cam-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+.cam-status:empty:not(.ok)::before { display: none; }
+.cam-status.ok::before { background: var(--ok); }
+.cam-status.bad { color: #ffb4ab; }
+.cam-status.bad::before { background: #ffb4ab; }
+.cam-status.rec { color: var(--live); }
+.cam-status.rec::before { background: var(--live); animation: pulse 1.2s ease-in-out infinite; }
+.cam-bar .btn { background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+.live-btn { color: var(--live); font-weight: 600; }
+.cam-bar .live-btn.on { background: var(--live); color: #fff; border-color: transparent; }
+.cam-bar #camYest[aria-pressed="true"] { background: var(--accent); color: #111; border-color: transparent; }
+
+.cam-main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+.cam-left { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cam-stage { position: relative; aspect-ratio: 16 / 9; max-height: calc(100vh - 300px); min-height: 200px; background: #000; border-radius: var(--r-card); overflow: hidden; border: 1px solid var(--line); }
+.cam-stage img, .cam-stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+.cam-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.cam-empty p { margin: 0 0 12px; }
+.cam-empty small { color: var(--ink-3); }
+.cam-empty .btn { margin: 3px; }
+.cam-over { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
+.cam-over > * { pointer-events: auto; }
+#camWhen { background: rgba(0,0,0,.6); padding: 4px 9px; border-radius: 6px; font-size: 13px; }
+#camWhen:empty { display: none; }
+.cam-over .btn { background: rgba(0,0,0,.6); height: 30px; margin-left: auto; }
+.live-note { position: absolute; left: 10px; right: 10px; bottom: 56px; text-align: center; font-size: 12px; color: var(--ink-2); text-shadow: 0 1px 6px #000; pointer-events: none; }
+
+.cam-ctl { display: flex; align-items: center; gap: 10px; }
+.cam-ctl .iconbtn { background: var(--glass); border-color: var(--line); color: var(--ink); }
+.cam-ctl .iconbtn:disabled { opacity: .35; cursor: default; }
+.cam-ctl .seg { background: var(--glass); }
+.cam-ctl .note { margin: 0; }
+.seg button:disabled { opacity: .4; cursor: default; }
+
+.timeline { position: relative; background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; user-select: none; -webkit-user-select: none; }
+.timeline .hours { display: flex; height: 18px; }
+.timeline .hours span { flex: 1; font-size: 10px; color: var(--ink-3); padding: 3px 3px 0; border-left: 1px solid var(--line); overflow: hidden; }
+.timeline .hours span:first-child { border-left: 0; }
+.lanes { display: flex; flex-direction: column; gap: 2px; cursor: crosshair; touch-action: none; }
+.lane { position: relative; height: 34px; background: rgba(255,255,255,.03); }
+.lane.on { background: rgba(255,255,255,.09); }
+.lane-name { position: absolute; left: 6px; top: 2px; font-size: 10.5px; color: var(--ink-3); pointer-events: none; z-index: 1; }
+.lane.on .lane-name { color: var(--ink); }
+.lane .density { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; }
+.lane .density i { position: absolute; bottom: 0; height: 5px; background: var(--accent); opacity: .55; }
+.lane .marks { position: absolute; left: 0; right: 0; top: 15px; bottom: 8px; }
+.lane .marks b { position: absolute; top: 0; bottom: 0; min-width: 4px; border-radius: 2px; background: var(--warn); cursor: pointer; }
+.lane .marks b.ding { background: var(--live); }
+.lane .marks b.on { box-shadow: 0 0 0 2px var(--ink); }
+.timeline .cursor { position: absolute; top: 16px; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); box-shadow: 0 0 6px rgba(0,0,0,.8); pointer-events: none; }
+
+.cam-events { background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px 10px 10px 14px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 130px); min-height: 0; }
+#camEvents { list-style: none; margin: 0; padding: 0 4px 0 0; overflow-y: auto; display: grid; gap: 4px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.22) transparent; }
+.ev { width: 100%; display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: center; padding: 5px; border-radius: 10px; border: 1px solid transparent; background: none; text-align: left; }
+.ev:hover { background: rgba(255,255,255,.06); }
+.ev.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.ev-thumb { position: relative; aspect-ratio: 16 / 9; border-radius: 7px; overflow: hidden; background: rgba(255,255,255,.06); }
+.ev-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ev-dur { position: absolute; right: 4px; bottom: 3px; font-size: 11px; background: rgba(0,0,0,.65); padding: 1px 5px; border-radius: 4px; font-variant-numeric: tabular-nums; }
+.ev-meta { display: flex; flex-direction: column; gap: 1px; font-size: 13.5px; min-width: 0; }
+.ev-meta b { font-weight: 600; display: flex; align-items: center; gap: 7px; font-variant-numeric: tabular-nums; }
+.ev-meta small { color: var(--ink-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); flex: none; }
+.ev.ding .ev-dot { background: var(--live); }
+
+/* camera settings */
+.field.num { flex: none; width: 74px; text-align: right; }
+.setrows { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.setrows .row > span:last-child { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 13px; }
+
+@media (max-width: 1000px) {
+  .cam-main { grid-template-columns: minmax(0, 1fr); }
+  .cam-stage { max-height: none; }
+  .cam-events { max-height: none; padding-right: 14px; }
+  #camEvents { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); overflow: visible; padding: 0; }
+  .ev { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}
+@media (max-width: 700px) {
+  .views { position: fixed; z-index: 25; left: 0; right: 0; bottom: 0; border-radius: 0; border-width: 1px 0 0; padding: 4px 12px calc(4px + env(safe-area-inset-bottom)); justify-content: space-around; background: var(--glass-strong); }
+  .views a { flex: 1; max-width: 160px; flex-direction: column; justify-content: center; height: auto; padding: 6px; gap: 2px; font-size: 11px; }
+  .views a svg { width: 21px; height: 21px; }
+  .stage { padding-bottom: calc(74px + env(safe-area-inset-bottom)); }
+  .toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .cams { margin-top: 0; }
+  .cam-bar .sp { display: none; }
+  .cam-bar .seg { width: 100%; overflow-x: auto; }
+  .cam-bar .seg button { flex: 1; white-space: nowrap; }
+  .cam-stage { margin-inline: calc(var(--gutter) * -1); border-radius: 0; border-width: 1px 0; }
+  .timeline .hours span:nth-child(odd) { color: transparent; }
+  .lane .marks b { min-width: 6px; }
+  #camEvents { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

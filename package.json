@@ -2,7 +2,7 @@
   "name": "portal",
   "version": "0.1.0",
   "private": true,
-  "description": "Personal browser home page: Unsplash backdrop, weather, site links, scores, stocks, and the daily camera summary.",
+  "description": "Personal browser home page (photo backdrop, sites, scores, stocks, weather) plus the security cameras: Ring recording and live view, Reolink playback, daily summary, retention.",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@fastify/static": "^7",
     "fastify": "^4",
+    "mqtt": "^5.16.1",
     "zod": "^3"
   },
   "devDependencies": {

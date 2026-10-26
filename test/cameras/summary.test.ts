@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { findLatest, summaryDate } from '../src/camera';
+import { findLatest, summaryDate } from '../../src/cameras/summary';
 
 const folder = new Date(2026, 9, 8);
 

@@ -5,8 +5,8 @@ import path from 'node:path';
 /**
  * The NAS camera script writes `Daily_Summary_<yesterday>.mp4` into
  * `SecurityCameras/yyyy/mm/dd/`. Portal keeps exactly one browser-friendly copy of the newest
- * summary and deletes its previous copy when a new one arrives. It only ever reads the camera
- * share (mounted read-only), so the originals stay under the camera system's own retention.
+ * summary and deletes its previous copy when a new one arrives. This module only reads the
+ * share; the originals are pruned by retention in reolink.ts.
  */
 
 const SUMMARY_RE = /^daily_summary_.*\.mp4$/i;
@@ -82,7 +82,7 @@ export function findLatest(root: string, now = Date.now()): SummaryFile | null {
   return found.at(-1) ?? null;
 }
 
-function run(cmd: string, args: string[]): Promise<string> {
+export function run(cmd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args);
     let out = '';

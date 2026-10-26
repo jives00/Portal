@@ -1,6 +1,9 @@
 /* Portal front end. Plain ES module, no build step.
  * Every module paints from the last saved copy in localStorage first, then refreshes from the
- * server, so the page is never blank and never shows a spinner first. */
+ * server, so the page is never blank and never shows a spinner first. The Cameras tab lives in
+ * cameras.js. */
+
+import { cameraKey, cameraSettings, hideCameras, initCameras, showCameras } from './cameras.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -372,29 +375,6 @@ function stocksCard() {
   return `<article class="card ${closed || moduleFailed.quotes ? 'stale' : ''}"><div class="card-h"><h2>Stocks</h2><span class="meta">${meta}${staleNote('quotes')}</span></div><div class="quotes scroll">${rows}</div></article>`;
 }
 
-/* ================= camera ================= */
-const fmtDur = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-function dayLabel(iso) {
-  const [y, m, d] = iso.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  const yest = new Date(); yest.setDate(yest.getDate() - 1);
-  const text = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  return date.toDateString() === yest.toDateString() ? `Yesterday · ${text}` : text;
-}
-function cameraCard() {
-  const cam = cached('camera');
-  const label = esc(S?.camera.label || 'Camera');
-  if (!cam || cam.none) {
-    const msg = cam?.processing ? 'Converting the latest daily summary. This takes a few minutes.'
-      : cam?.error ? esc(cam.error)
-      : 'No daily summary yet. It shows up here the morning after the camera script runs.';
-    return `<article class="card"><div class="card-h"><h2>Camera</h2><span class="meta">${label} · daily summary</span></div><div class="poster none">${cam || moduleFailed.camera ? msg : '<div class="skel" style="width:60%"></div>'}</div></article>`;
-  }
-  return `<article class="card"><div class="card-h"><h2>Camera</h2><span class="meta">${label} · daily summary</span></div>
-    <button class="poster" data-play aria-label="Play the daily summary for ${esc(dayLabel(cam.date))}"><img src="${esc(cam.poster)}" alt="${label} camera, ${esc(dayLabel(cam.date))}"><span class="play"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span></span><span class="dur tnum">${fmtDur(cam.duration)}</span></button>
-    <div class="cam-meta"><span>${esc(dayLabel(cam.date))}</span><span>${cam.processing ? 'Converting a newer summary…' : 'Replaced each morning'}</span></div></article>`;
-}
-
 /* ================= cards ================= */
 /*
  * Refreshes swap only the card whose HTML changed, in place, keeping its list's scroll position.
@@ -403,8 +383,8 @@ function cameraCard() {
 const cardHtml = {};
 function renderCards() {
   const box = $('cards');
-  const make = { scores: scoresCard, stocks: stocksCard, camera: cameraCard };
-  const ids = S ? S.cards.filter((c) => c.on).map((c) => c.id) : ['scores', 'stocks', 'camera'];
+  const make = { scores: scoresCard, stocks: stocksCard, weather: weatherCard };
+  const ids = S ? S.cards.filter((c) => c.on).map((c) => c.id) : ['scores', 'stocks', 'weather'];
   [...box.children].forEach((el) => { if (!ids.includes(el.dataset.card)) el.remove(); });
   ids.forEach((id, i) => {
     const html = make[id]();
@@ -426,32 +406,6 @@ function renderCards() {
   // The rise-in animation is for the first paint only.
   if (!box.dataset.settled) { box.dataset.settled = '1'; setTimeout(() => box.classList.add('settled'), 800); }
 }
-$('cards').addEventListener('click', (e) => {
-  if (e.target.closest('[data-play]')) openTheater();
-});
-
-/* ================= theater ================= */
-function openTheater() {
-  const cam = cached('camera');
-  if (!cam || cam.none) return;
-  $('theater').hidden = false;
-  $('theaterTitle').textContent = `${S?.camera.label || 'Camera'} · ${dayLabel(cam.date)}`;
-  const v = $('video');
-  if (!v.src.endsWith(cam.video)) { v.src = cam.video; v.poster = cam.poster; }
-  v.defaultPlaybackRate = v.playbackRate = +document.querySelector('#speed [aria-pressed="true"]').dataset.r;
-  v.play().catch(() => {});
-  $('clipLabel').textContent = `Daily summary · ${fmtDur(cam.duration)}`;
-  $('closeTheater').focus();
-}
-$('speed').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-r]');
-  if (!b) return;
-  [...$('speed').children].forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  $('video').defaultPlaybackRate = $('video').playbackRate = +b.dataset.r;
-});
-function closeTheater() { $('video').pause(); $('theater').hidden = true; }
-$('closeTheater').onclick = closeTheater;
-$('theater').addEventListener('click', (e) => { if (e.target === $('theater')) closeTheater(); });
 
 /* ================= weather ================= */
 const WX = (c) => c === 0 ? ['Clear', 'sun'] : c <= 2 ? ['Partly cloudy', 'part'] : c === 3 ? ['Overcast', 'cloud']
@@ -475,10 +429,14 @@ function wxIcon(code, day = 1) {
   }[k];
   return `<svg viewBox="0 0 32 32" aria-hidden="true">${body}</svg>`;
 }
-function renderWeather() {
-  const el = $('wx');
+const rainPct = (p) => (p >= 20 ? `${p}%` : '');
+/** Today now, the next 12 hours (every 2nd), and the next 5 days with a shared low–high scale. */
+function weatherCard() {
   const w = cached('weather');
-  if (!w || !S || w.key !== wxKey()) { el.innerHTML = ''; return; }
+  const head = `<div class="card-h"><h2>Weather</h2><span class="meta">${esc(S?.weather.name || '')}${staleNote('weather')}</span></div>`;
+  if (!w || !S || w.key !== wxKey()) {
+    return `<article class="card">${head}${moduleFailed.weather ? '<p class="empty">The forecast is unavailable right now.</p>' : skeleton(3)}</article>`;
+  }
   const { current: c, daily: d, hourly: h } = w;
   const now = Date.now();
   let start = h.time.findIndex((t) => new Date(t).getTime() > now);
@@ -487,28 +445,39 @@ function renderWeather() {
   for (let i = start; hours.length < 6 && i < h.time.length; i += 2) hours.push(i);
   const fmtH = (t) => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric' });
   const rain = d.precipitation_probability_max[0];
-  el.classList.remove('loading');
-  el.innerHTML = `<div class="wx-now" title="${esc(S.weather.name)}">${wxIcon(c.weather_code, c.is_day)}<span class="wx-temp">${Math.round(c.temperature_2m)}°</span>
+  const days = [1, 2, 3, 4, 5].filter((i) => i < d.time.length);
+  const lo = Math.min(...days.map((i) => d.temperature_2m_min[i]));
+  const span = Math.max(...days.map((i) => d.temperature_2m_max[i])) - lo || 1;
+  const pct = (t) => (((t - lo) / span) * 100).toFixed(1);
+  const dayRows = days.map((i) => {
+    const name = new Date(`${d.time[i]}T12:00`).toLocaleDateString('en-US', { weekday: 'short' });
+    const min = d.temperature_2m_min[i], max = d.temperature_2m_max[i];
+    return `<div class="wx-d" title="${WX(d.weather_code[i])[0]}"><span class="dn">${name}</span>${wxIcon(d.weather_code[i])}<span class="pp">${rainPct(d.precipitation_probability_max[i])}</span>
+      <span class="lo">${Math.round(min)}°</span><span class="wx-range"><i style="left:${pct(min)}%;right:${(100 - pct(max)).toFixed(1)}%"></i></span><span class="hi">${Math.round(max)}°</span></div>`;
+  }).join('');
+  return `<article class="card ${moduleFailed.weather ? 'stale' : ''}">${head}
+    <div class="wx-now">${wxIcon(c.weather_code, c.is_day)}<span class="wx-temp">${Math.round(c.temperature_2m)}°</span>
       <span class="wx-desc"><strong>${WX(c.weather_code)[0]}</strong>H ${Math.round(d.temperature_2m_max[0])}° · L ${Math.round(d.temperature_2m_min[0])}°${rain >= 20 ? ` · ${rain}% rain` : ''}</span></div>
-    ${S.weather.hourly ? `<div class="wx-hours">${hours.map((i) => `<div class="wx-h"><span>${fmtH(h.time[i])}</span>${wxIcon(h.weather_code[i], h.is_day[i])}<b>${Math.round(h.temperature_2m[i])}°</b><span class="pp">${h.precipitation_probability[i] >= 20 ? `${h.precipitation_probability[i]}%` : ''}</span></div>`).join('')}</div>` : ''}`;
+    ${S.weather.hourly ? `<div class="wx-hours">${hours.map((i) => `<div class="wx-h"><span>${fmtH(h.time[i])}</span>${wxIcon(h.weather_code[i], h.is_day[i])}<b>${Math.round(h.temperature_2m[i])}°</b><span class="pp">${rainPct(h.precipitation_probability[i])}</span></div>`).join('')}</div>` : ''}
+    <div class="wx-days">${dayRows}</div></article>`;
 }
-const wxKey = () => `${S.weather.lat},${S.weather.lon},${S.weather.unit}`;
+/** The trailing version is bumped when the request changes, so an older cached forecast is refetched. */
+const wxKey = () => `${S.weather.lat},${S.weather.lon},${S.weather.unit},2`;
 async function loadWeather(force = false) {
   if (!S) return;
   const w = cache.weather;
   if (!force && w && w.value.key === wxKey() && Date.now() - w.at < 15 * 60e3) return;
-  if (force) $('wx').classList.add('loading');
   const { lat, lon, unit } = S.weather;
   try {
     // Open-Meteo is called straight from the browser: free, no key, and it allows CORS.
-    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,weather_code,precipitation_probability,is_day&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=2&timezone=auto${unit === 'F' ? '&temperature_unit=fahrenheit' : ''}`);
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,weather_code,precipitation_probability,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=6&timezone=auto${unit === 'F' ? '&temperature_unit=fahrenheit' : ''}`);
     if (!r.ok) throw new Error(r.status);
     stash('weather', { ...(await r.json()), key: wxKey() });
+    moduleFailed.weather = false;
   } catch {
-    $('wx').classList.remove('loading');
-    return;
+    moduleFailed.weather = true;
   }
-  renderWeather();
+  renderCards();
 }
 
 /* ================= data refresh ================= */
@@ -523,27 +492,25 @@ async function load(key, path) {
 }
 async function refreshScores() { await load('scores', 'api/scores'); renderCards(); }
 async function refreshQuotes() { await load('quotes', 'api/quotes'); renderCards(); }
-async function refreshCamera() { await load('camera', 'api/camera'); renderCards(); }
 async function refreshStatus() {
   try { statuses = await api('api/status'); stash('status', statuses); } catch {}
   renderDock();
 }
 function refreshAll() {
-  refreshScores(); refreshQuotes(); refreshCamera(); refreshStatus(); loadWeather();
+  refreshScores(); refreshQuotes(); refreshStatus(); loadWeather();
   const now = Date.now();
-  lastRun = { scores: now, quotes: now, status: now, camera: now, weather: now };
+  lastRun = { scores: now, quotes: now, status: now, weather: now };
 }
 
-// Poll only while the page is visible. Scores speed up while a game is live.
+// Poll only while Home is visible (it catches up on return). Scores speed up while a game is live.
 function every(name, ms, fn) {
-  if (document.hidden) return;
+  if (document.hidden || view !== 'home') return;
   if (Date.now() - (lastRun[name] || 0) >= ms()) { lastRun[name] = Date.now(); fn(); }
 }
 setInterval(() => {
   every('scores', () => (cached('scores')?.games.some((g) => g.state === 'live') ? 30e3 : 120e3), refreshScores);
   every('quotes', () => 60e3, refreshQuotes);
   every('status', () => 60e3, refreshStatus);
-  every('camera', () => 10 * 60e3, refreshCamera);
   every('weather', () => 5 * 60e3, () => loadWeather());
 }, 5000);
 document.addEventListener('visibilitychange', () => {
@@ -557,7 +524,7 @@ const ICON = {
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
 };
-const TABS = ['Background', 'Weather', 'Links', 'Sports', 'Stocks', 'Camera', 'Layout'];
+const TABS = ['Background', 'Weather', 'Links', 'Sports', 'Stocks', 'Cameras', 'Layout'];
 const LEAGUES = ['NFL', 'NBA', 'NCAAB', 'MLB'];
 // Mirrors INDEX_LABELS in src/quotes.ts.
 const INDEXES = [
@@ -633,7 +600,7 @@ function renderSettings() {
       const b = e.target.closest('[data-u]');
       if (b && b.dataset.u !== S.weather.unit) { change(`Showing °${b.dataset.u}`, (s) => (s.weather.unit = b.dataset.u)); loadWeather(true); }
     };
-    $('wxHourSw').onchange = (e) => { change(e.target.checked ? 'Hourly forecast on' : 'Hourly forecast off', (s) => (s.weather.hourly = e.target.checked)); renderWeather(); };
+    $('wxHourSw').onchange = (e) => change(e.target.checked ? 'Hourly forecast on' : 'Hourly forecast off', (s) => (s.weather.hourly = e.target.checked));
   }
 
   if (tab === 'Links') {
@@ -715,20 +682,15 @@ function renderSettings() {
     });
   }
 
-  if (tab === 'Camera') {
-    const cam = cached('camera');
-    P.innerHTML = `<section><h3>Camera name</h3><form class="addrow" id="camForm"><input id="camLabel" value="${esc(S.camera.label)}" maxlength="40" aria-label="Camera name"><button class="btn">Save</button></form></section>
-      <section><h3>What shows</h3><p class="note" style="margin:0">Always the newest daily summary from the SecurityCameras share. Portal keeps one converted copy and replaces it when the next day's summary lands. It never changes the original recordings.</p>
-      ${cam?.error ? `<p class="err">${esc(cam.error)}</p>` : ''}</section>`;
-    $('camForm').onsubmit = (e) => { e.preventDefault(); const v = $('camLabel').value.trim() || 'Camera'; change(`Camera renamed to ${v}`, (s) => (s.camera.label = v)); };
-  }
+  // Camera settings have their own store and an explicit Save, since a retention change deletes footage.
+  if (tab === 'Cameras') cameraSettings(P);
 
   if (tab === 'Layout') {
-    const label = { scores: 'Scores', stocks: 'Stocks', camera: 'Camera' };
+    const label = { scores: 'Scores', stocks: 'Stocks', weather: 'Weather' };
     P.innerHTML = `<section><h3>Cards · left to right</h3><div class="list">${S.cards.map((c, i) => `<div class="li"><span class="grow">${label[c.id]}</span>${moveBtns('cards', i, S.cards.length)}
         <input type="checkbox" class="switch" data-card="${i}" ${c.on ? 'checked' : ''} aria-label="Show ${label[c.id]}"></div>`).join('')}</div></section>
       <section><div class="row"><span>Show the sites bar</span><input type="checkbox" class="switch" id="linksSw" ${S.showLinks !== false ? 'checked' : ''}></div></section>
-      <section><div class="row"><span>Focus mode: photo, clock and weather only<br><small class="note">Shortcut: <kbd>.</kbd> · remembered on this browser</small></span><input type="checkbox" class="switch" id="focusSw" ${local.focus ? 'checked' : ''}></div></section>`;
+      <section><div class="row"><span>Focus mode: photo and clock only<br><small class="note">Shortcut: <kbd>.</kbd> · remembered on this browser</small></span><input type="checkbox" class="switch" id="focusSw" ${local.focus ? 'checked' : ''}></div></section>`;
     P.querySelectorAll('[data-card]').forEach((sw) => (sw.onchange = () => {
       const i = +sw.dataset.card;
       change(`${label[S.cards[i].id]} ${sw.checked ? 'shown' : 'hidden'}`, (s) => (s.cards[i].on = sw.checked));
@@ -754,6 +716,7 @@ $('tabpanel').addEventListener('click', (e) => {
 });
 function openSettings() {
   if (!S) return;
+  if (view === 'cameras') tab = 'Cameras';
   $('drawer').classList.add('open');
   renderSettings();
   setTimeout(() => $('tabs').querySelector('[aria-selected="true"]')?.focus(), 50);
@@ -775,22 +738,21 @@ document.addEventListener('keydown', (e) => {
   const typing = e.target.matches('input, textarea, select');
   if (e.key === 'Escape') {
     if (!$('keys').hidden) { $('keys').hidden = true; return; }
-    if (!$('theater').hidden) return closeTheater();
     if ($('drawer').classList.contains('open')) return closeSettings();
+    if (view === 'cameras') { cameraKey(e); return; }
     if (filterText) { filterText = ''; renderDock(); }
     return;
   }
   if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (!$('theater').hidden && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-    // ±10s, or ±30s with Shift. Handled here so it works whatever has focus in the theater.
-    e.preventDefault();
-    const v = $('video');
-    const step = (e.shiftKey ? 30 : 10) * (e.key === 'ArrowLeft' ? -1 : 1);
-    v.currentTime = Math.max(0, Math.min(v.duration || Infinity, v.currentTime + step));
+  if ($('drawer').classList.contains('open')) return;
+  if (!$('keys').hidden) $('keys').hidden = true;
+  if (view === 'cameras') {
+    // Handled here so the keys work whatever has focus, including the video's own controls.
+    if (cameraKey(e)) return;
+    if (e.key === '?') { e.preventDefault(); $('keys').hidden = false; }
+    if (e.key === ',') { e.preventDefault(); openSettings(); }
     return;
   }
-  if (!$('theater').hidden ||$('drawer').classList.contains('open')) return;
-  if (!$('keys').hidden) $('keys').hidden = true;
   if (/^[1-9]$/.test(e.key)) { e.preventDefault(); openLink(+e.key - 1, e.shiftKey); return; }
   if (e.key === '?') { e.preventDefault(); $('keys').hidden = false; return; }
   if (/^[a-z]$/i.test(e.key) && dockVisible()) { e.preventDefault(); filterText += e.key; renderDock(); return; }
@@ -803,14 +765,33 @@ document.addEventListener('keydown', (e) => {
 });
 $('keys').onclick = () => ($('keys').hidden = true);
 
+/* ================= pages ================= */
+// Home and Cameras, picked by the URL hash so each can be bookmarked (#cameras).
+let view = 'home';
+const viewFromHash = () => (location.hash === '#cameras' ? 'cameras' : 'home');
+function setView(next) {
+  document.body.dataset.view = next;
+  if (next === view) return;
+  view = next;
+  $('cams').hidden = next !== 'cameras';
+  for (const a of $('views').querySelectorAll('[data-view]')) {
+    if (a.dataset.view === next) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  }
+  document.title = next === 'cameras' ? 'Cameras · Portal' : 'Portal';
+  if (next === 'cameras') showCameras();
+  else { hideCameras(); renderAll(); }
+}
+window.addEventListener('hashchange', () => setView(viewFromHash()));
+initCameras({ api, esc, toast });
+
 /* ================= boot ================= */
 function renderAll() {
   renderDock();
   renderCards();
-  renderWeather();
   if ($('drawer').classList.contains('open')) renderSettings();
 }
 
+setView(viewFromHash());
 tick();
 setInterval(tick, 1000);
 renderAll();

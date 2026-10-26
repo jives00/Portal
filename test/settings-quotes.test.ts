@@ -33,6 +33,15 @@ describe('SettingsStore', () => {
     expect(s).not.toHaveProperty('showIndexes');
   });
 
+  it('swaps the old camera card for the weather card, keeping its place and switch', () => {
+    const file = tmp();
+    const cards = [{ id: 'camera', on: false }, { id: 'scores', on: true }, { id: 'stocks', on: true }];
+    fs.writeFileSync(file, JSON.stringify({ ...DEFAULTS, cards, camera: { label: 'Driveway' } }));
+    const s = new SettingsStore(file, quiet).get();
+    expect(s.cards).toEqual([{ id: 'weather', on: false }, { id: 'scores', on: true }, { id: 'stocks', on: true }]);
+    expect(s).not.toHaveProperty('camera');
+  });
+
   it('rejects invalid settings without changing what is saved', () => {
     const store = new SettingsStore(tmp(), quiet);
     expect(() => store.set({ ...store.get(), tickers: ['not a symbol'] })).toThrow();

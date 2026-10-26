@@ -25,6 +25,10 @@
 
 <div class="stage">
   <div class="topbar">
+    <nav class="views" id="views" aria-label="Pages">
+      <a href="#" data-view="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+      <a href="#cameras" data-view="cameras"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg><span>Cameras</span></a>
+    </nav>
     <div class="photo-ctl">
       <button class="iconbtn" id="nextPhoto" title="Next photo  (Space)" aria-label="Next photo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg>
@@ -45,12 +49,52 @@
   <section class="hero">
     <h1 class="clock tnum" id="clock">9:41</h1>
     <p class="dateline" id="dateline"></p>
-    <div class="wx" id="wx"></div>
   </section>
 
   <nav class="dock" id="dock" aria-label="My sites"></nav>
 
   <section class="cards" id="cards"></section>
+
+  <section class="cams" id="cams" hidden aria-label="Cameras">
+    <div class="cam-bar">
+      <div class="seg" id="camPick" aria-label="Camera" hidden></div>
+      <div class="cam-day">
+        <button class="iconbtn" id="camPrev" aria-label="Previous day" title="Previous day  ( [ )"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <input type="date" class="field" id="camDate" aria-label="Day">
+        <button class="iconbtn" id="camNext" aria-label="Next day" title="Next day  ( ] )"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+      <span class="sp"></span>
+      <span class="cam-status" id="camStatus"></span>
+      <button class="btn" id="camYest" aria-pressed="false" title="Yesterday's daily summary  (Y)" hidden>Yesterday</button>
+      <button class="btn live-btn" id="camLive" hidden>● Live</button>
+    </div>
+
+    <div class="cam-main">
+      <div class="cam-left">
+        <div class="cam-stage" id="camStageBox">
+          <img id="camFrame" alt="" hidden>
+          <video id="camVideo" controls playsinline controlslist="noplaybackrate" disablepictureinpicture hidden></video>
+          <div class="cam-empty" id="camEmpty" hidden></div>
+          <div class="cam-over"><span id="camWhen" class="tnum"></span><button class="btn" id="camBack" hidden>✕ Back to timeline</button></div>
+          <div class="live-note" id="liveNote" hidden>Ring pauses motion events while live view is open, so nothing records until you close it.</div>
+        </div>
+        <div class="cam-ctl">
+          <button class="iconbtn" id="camPlay" aria-label="Play" title="Play / pause  (Space)"></button>
+          <div class="seg" id="camRate" aria-label="Speed"><button data-r="1">1×</button><button data-r="2">2×</button><button data-r="4">4×</button></div>
+          <span class="note" id="camRateLabel"></span>
+        </div>
+        <div class="timeline">
+          <div class="hours" id="camHours"></div>
+          <div class="lanes" id="camLanes"></div>
+          <div class="cursor" id="camCursor" hidden></div>
+        </div>
+      </div>
+      <aside class="cam-events">
+        <div class="card-h"><h2>Events</h2><span class="meta" id="camCount"></span></div>
+        <ol id="camEvents"></ol>
+      </aside>
+    </div>
+  </section>
 
   <footer class="foot">
     <span><span id="offline" class="pill" hidden>Can't reach Portal's server · showing saved data</span></span>
@@ -68,24 +112,6 @@
   <div class="tabpanel" id="tabpanel" role="tabpanel"></div>
 </aside>
 
-<div class="theater" id="theater" hidden>
-  <div class="theater-box">
-    <div class="theater-h">
-      <h2 id="theaterTitle">Driveway</h2>
-      <span class="sp"></span>
-      <button class="iconbtn" id="closeTheater" aria-label="Close player  (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    </div>
-    <video id="video" controls playsinline preload="none"></video>
-    <div class="theater-c">
-      <span id="clipLabel"></span>
-      <div class="seg" id="speed" aria-label="Playback speed">
-        <button aria-pressed="false" data-r="1">1×</button><button aria-pressed="true" data-r="2">2×</button><button aria-pressed="false" data-r="4">4×</button>
-      </div>
-    </div>
-    
-  </div>
-</div>
-
 <div class="keys" id="keys" hidden>
   <div class="panel">
     <h3 style="margin:0 0 14px;font:600 13px/1 var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)">Shortcuts</h3>
@@ -96,8 +122,12 @@
       <dt><kbd>Space</kbd></dt><dd style="margin:0">Next photo</dd>
       <dt><kbd>.</kbd></dt><dd style="margin:0">Focus mode (hide sites and cards)</dd>
       <dt><kbd>,</kbd></dt><dd style="margin:0">Settings</dd>
-      <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd style="margin:0">Video: skip 10s (<kbd>Shift</kbd> for 30s)</dd>
       <dt><kbd>Esc</kbd></dt><dd style="margin:0">Close / clear filter</dd>
+      <dt style="grid-column:1/-1;text-align:left;margin-top:6px;color:var(--ink-3)">On Cameras</dt>
+      <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd style="margin:0">Step stills, or skip 10s in a video (<kbd>Shift</kbd>: ×10 / 30s)</dd>
+      <dt><kbd>Space</kbd></dt><dd style="margin:0">Play / pause</dd>
+      <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd style="margin:0">Previous / next day</dd>
+      <dt><kbd>L</kbd> <kbd>Y</kbd></dt><dd style="margin:0">Live view / Yesterday</dd>
     </dl>
   </div>
 </div>

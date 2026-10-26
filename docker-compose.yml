@@ -1,4 +1,5 @@
-# Lives at /volume2/docker/portal on the NAS, next to a .env holding UNSPLASH_ACCESS_KEY.
+# Lives at /volume2/docker/portal on the NAS, next to a .env holding UNSPLASH_ACCESS_KEY, plus
+# mosquitto/ and ring-mqtt/ (copied from nas/).
 services:
   portal:
     image: ghcr.io/jives00/portal:latest
@@ -10,8 +11,42 @@ services:
     environment:
       - TZ=America/Chicago
       - NAS_HOST=192.168.0.105
+      - MQTT_URL=mqtt://mosquitto:1883
+      - RTSP_BASE=rtsp://ring-mqtt:8554
     volumes:
       - /volume2/docker/portal/data:/data
-      # Read-only: Portal never changes the original recordings.
-      - /volume2/SecurityCameras:/cameras:ro
+      # Read-write: Ring footage goes to /cameras/Sentry, and retention prunes old Reolink uploads
+      # and daily summaries. Nothing is ever added to the share's top-level YYYY/MM/DD folders,
+      # because the DSM daily-summary task concatenates every .mp4 it finds there.
+      - /volume2/SecurityCameras:/cameras
+    depends_on:
+      - mosquitto
+      - ring-mqtt
+    restart: unless-stopped
+
+  ring-mqtt:
+    image: tsightler/ring-mqtt:latest   # Docker Hub; not published on ghcr despite the wiki
+    container_name: portal-ring
+    # RTSP (8554) stays on the compose network. 55123 is ring-mqtt's login page, used once to
+    # get a Ring refresh token; it goes quiet after that.
+    ports:
+      - "55123:55123"
+    environment:
+      - TZ=America/Chicago
+    volumes:
+      # config.json plus ring-state.json (the refresh token; treat it like a password).
+      - /volume2/docker/portal/ring-mqtt:/data
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: portal-mqtt
+    volumes:
+      - /volume2/docker/portal/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     restart: unless-stopped
