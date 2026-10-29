@@ -328,11 +328,13 @@ body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturat
 .cam-status.rec::before { background: var(--live); animation: pulse 1.2s ease-in-out infinite; }
 .cam-bar .btn { background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
 .live-btn { color: var(--live); font-weight: 600; }
-.cam-bar .live-btn.on { background: var(--live); color: #fff; border-color: transparent; }
 .cam-bar #camYest[aria-pressed="true"] { background: var(--accent); color: #111; border-color: transparent; }
 
-.cam-main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
-.cam-left { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* Side by side, one column per camera showing; stacked at phone width. */
+.cam-panels { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+.cam-panel { display: flex; flex-direction: column; gap: 10px; min-width: 0; container-type: inline-size; }
+.cam-panel.focus .cam-stage { border-color: rgba(255,255,255,.32); }
+.cam-none { padding: 40px 20px; text-align: center; color: var(--ink-2); font-size: 14px; background: var(--glass); border: 1px solid var(--line); border-radius: var(--r-card); }
 .cam-stage { position: relative; aspect-ratio: 16 / 9; max-height: calc(100vh - 300px); min-height: 200px; background: #000; border-radius: var(--r-card); overflow: hidden; border: 1px solid var(--line); }
 .cam-stage img, .cam-stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
 .cam-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
@@ -341,8 +343,8 @@ body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturat
 .cam-empty .btn { margin: 3px; }
 .cam-over { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
 .cam-over > * { pointer-events: auto; }
-#camWhen { background: rgba(0,0,0,.6); padding: 4px 9px; border-radius: 6px; font-size: 13px; }
-#camWhen:empty { display: none; }
+.cam-when { background: rgba(0,0,0,.6); padding: 4px 9px; border-radius: 6px; font-size: 13px; }
+.cam-when:empty { display: none; }
 .cam-over .btn { background: rgba(0,0,0,.6); height: 30px; margin-left: auto; }
 .live-note { position: absolute; left: 10px; right: 10px; bottom: 56px; text-align: center; font-size: 12px; color: var(--ink-2); text-shadow: 0 1px 6px #000; pointer-events: none; }
 
@@ -351,17 +353,16 @@ body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturat
 .cam-ctl .iconbtn:disabled { opacity: .35; cursor: default; }
 .cam-ctl .seg { background: var(--glass); }
 .cam-ctl .note { margin: 0; }
+.cam-ctl .sp { flex: 1; }
+.cam-ctl .btn { background: var(--glass); }
+.cam-ctl .live-btn.on { background: var(--live); color: #fff; border-color: transparent; }
 .seg button:disabled { opacity: .4; cursor: default; }
 
 .timeline { position: relative; background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; user-select: none; -webkit-user-select: none; }
 .timeline .hours { display: flex; height: 18px; }
 .timeline .hours span { flex: 1; font-size: 10px; color: var(--ink-3); padding: 3px 3px 0; border-left: 1px solid var(--line); overflow: hidden; }
 .timeline .hours span:first-child { border-left: 0; }
-.lanes { display: flex; flex-direction: column; gap: 2px; cursor: crosshair; touch-action: none; }
-.lane { position: relative; height: 34px; background: rgba(255,255,255,.03); }
-.lane.on { background: rgba(255,255,255,.09); }
-.lane-name { position: absolute; left: 6px; top: 2px; font-size: 10.5px; color: var(--ink-3); pointer-events: none; z-index: 1; }
-.lane.on .lane-name { color: var(--ink); }
+.lane { position: relative; height: 34px; background: rgba(255,255,255,.03); cursor: crosshair; touch-action: none; }
 .lane .density { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; }
 .lane .density i { position: absolute; bottom: 0; height: 5px; background: var(--accent); opacity: .55; }
 .lane .marks { position: absolute; left: 0; right: 0; top: 15px; bottom: 8px; }
@@ -369,10 +370,12 @@ body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturat
 .lane .marks b.ding { background: var(--live); }
 .lane .marks b.on { box-shadow: 0 0 0 2px var(--ink); }
 .timeline .cursor { position: absolute; top: 16px; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); box-shadow: 0 0 6px rgba(0,0,0,.8); pointer-events: none; }
+@container (max-width: 560px) { .timeline .hours span:nth-child(odd) { color: transparent; } }
 
-.cam-events { background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px 10px 10px 14px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 130px); min-height: 0; }
-#camEvents { list-style: none; margin: 0; padding: 0 4px 0 0; overflow-y: auto; display: grid; gap: 4px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.22) transparent; }
-.ev { width: 100%; display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: center; padding: 5px; border-radius: 10px; border: 1px solid transparent; background: none; text-align: left; }
+.cam-events { background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+#camEvents { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 4px; }
+#camEvents .empty { grid-column: 1 / -1; }
+.ev { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; align-items: center; padding: 5px; border-radius: 10px; border: 1px solid transparent; background: none; text-align: left; }
 .ev:hover { background: rgba(255,255,255,.06); }
 .ev.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .ev-thumb { position: relative; aspect-ratio: 16 / 9; border-radius: 7px; overflow: hidden; background: rgba(255,255,255,.06); }
@@ -389,13 +392,6 @@ body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturat
 .setrows { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .setrows .row > span:last-child { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 13px; }
 
-@media (max-width: 1000px) {
-  .cam-main { grid-template-columns: minmax(0, 1fr); }
-  .cam-stage { max-height: none; }
-  .cam-events { max-height: none; padding-right: 14px; }
-  #camEvents { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); overflow: visible; padding: 0; }
-  .ev { grid-template-columns: minmax(0, 1fr); gap: 6px; }
-}
 @media (max-width: 700px) {
   .views { position: fixed; z-index: 25; left: 0; right: 0; bottom: 0; border-radius: 0; border-width: 1px 0 0; padding: 4px 12px calc(4px + env(safe-area-inset-bottom)); justify-content: space-around; background: var(--glass-strong); }
   .views a { flex: 1; max-width: 160px; flex-direction: column; justify-content: center; height: auto; padding: 6px; gap: 2px; font-size: 11px; }
@@ -406,8 +402,8 @@ body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturat
   .cam-bar .sp { display: none; }
   .cam-bar .seg { width: 100%; overflow-x: auto; }
   .cam-bar .seg button { flex: 1; white-space: nowrap; }
-  .cam-stage { margin-inline: calc(var(--gutter) * -1); border-radius: 0; border-width: 1px 0; }
-  .timeline .hours span:nth-child(odd) { color: transparent; }
+  .cam-panels { grid-auto-flow: row; }
+  .cam-stage { max-height: none; margin-inline: calc(var(--gutter) * -1); border-radius: 0; border-width: 1px 0; }
   .lane .marks b { min-width: 6px; }
   #camEvents { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

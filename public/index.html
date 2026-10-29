@@ -65,35 +65,16 @@
       </div>
       <span class="sp"></span>
       <span class="cam-status" id="camStatus"></span>
-      <button class="btn" id="camYest" aria-pressed="false" title="Yesterday's daily summary  (Y)" hidden>Yesterday</button>
-      <button class="btn live-btn" id="camLive" hidden>● Live</button>
+      <button class="btn" id="camYest" aria-pressed="false" title="Yesterday on every camera: the daily summary, or a timelapse  (Y)" hidden>Yesterday</button>
     </div>
 
-    <div class="cam-main">
-      <div class="cam-left">
-        <div class="cam-stage" id="camStageBox">
-          <img id="camFrame" alt="" hidden>
-          <video id="camVideo" controls playsinline controlslist="noplaybackrate" disablepictureinpicture hidden></video>
-          <div class="cam-empty" id="camEmpty" hidden></div>
-          <div class="cam-over"><span id="camWhen" class="tnum"></span><button class="btn" id="camBack" hidden>✕ Back to timeline</button></div>
-          <div class="live-note" id="liveNote" hidden>Ring pauses motion events while live view is open, so nothing records until you close it.</div>
-        </div>
-        <div class="cam-ctl">
-          <button class="iconbtn" id="camPlay" aria-label="Play" title="Play / pause  (Space)"></button>
-          <div class="seg" id="camRate" aria-label="Speed"><button data-r="1">1×</button><button data-r="2">2×</button><button data-r="4">4×</button></div>
-          <span class="note" id="camRateLabel"></span>
-        </div>
-        <div class="timeline">
-          <div class="hours" id="camHours"></div>
-          <div class="lanes" id="camLanes"></div>
-          <div class="cursor" id="camCursor" hidden></div>
-        </div>
-      </div>
-      <aside class="cam-events">
-        <div class="card-h"><h2>Events</h2><span class="meta" id="camCount"></span></div>
-        <ol id="camEvents"></ol>
-      </aside>
-    </div>
+    <!-- One .cam-panel per camera (stage, controls, timeline), built by cameras.js. -->
+    <div class="cam-panels" id="camPanels"></div>
+
+    <section class="cam-events">
+      <div class="card-h"><h2>Events</h2><span class="meta" id="camCount"></span></div>
+      <ol id="camEvents"></ol>
+    </section>
   </section>
 
   <footer class="foot">
