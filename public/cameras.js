@@ -1,6 +1,7 @@
 /* Cameras tab. The cameras sit side by side, each with its own stage and timeline. One stage
  * shows that camera's stills (scrub or timelapse), an event clip, Ring live view, or yesterday's
- * daily summary. One event list below covers every camera showing.
+ * daily summary. A timelapse that reaches an event plays its clip, then carries on. One event list
+ * below covers every camera showing.
  *
  * Ring stills are its 30 s interval snapshots; Reolink stills are the one JPG it uploads per
  * event. Reolink clips are 4K HEVC and play as uploaded, so a browser without HEVC gets a notice
@@ -81,7 +82,7 @@ const panelHtml = (c) => `<div class="cam-panel" data-slug="${esc(c.slug)}">
     <img class="cam-frame" alt="" hidden>
     <video controls playsinline controlslist="noplaybackrate" disablepictureinpicture hidden></video>
     <div class="cam-empty" hidden></div>
-    <div class="cam-over"><span class="cam-when tnum"></span><button class="btn" data-act="back" hidden>✕ Back to timeline</button></div>
+    <div class="cam-over"><span class="cam-when tnum"></span></div>
     <div class="live-note" hidden>Ring pauses motion events while live view is open, so nothing records until you close it.</div>
   </div>
   <div class="cam-ctl">
@@ -118,11 +119,11 @@ function renderPanels() {
     const p = {
       slug: el.dataset.slug, el,
       frame: q('.cam-frame'), video: q('video'), empty: q('.cam-empty'), when: q('.cam-when'),
-      back: q('[data-act="back"]'), liveNote: q('.live-note'), play: q('[data-act="play"]'),
+      liveNote: q('.live-note'), play: q('[data-act="play"]'),
       rate: q('.seg'), rateLabel: q('.cam-rate-label'), liveBtn: q('[data-act="live"]'),
       lane: q('.lane'), cursor: q('.cursor'),
       mode: 'frame', // frame | clip | live | summary | notice
-      pos: -1, clip: null, live: null, playing: null,
+      pos: -1, clip: null, live: null, playing: null, lapse: null, sumI: -1, playIcon: null,
     };
     wireVideo(p);
     return p;
@@ -169,6 +170,7 @@ function resetStage(p) {
   stopTimelapse(p);
   stopLive(p);
   closeVideo(p);
+  p.lapse = null;
   p.frame.hidden = true;
   p.empty.hidden = true;
   p.liveNote.hidden = true;
@@ -211,7 +213,7 @@ function showNotice(p, html) {
   renderControls(p);
 }
 
-function openVideo(p, src, rate, poster = '') {
+function openVideo(p, src, rate, poster = '', autoplay = true) {
   const v = p.video;
   p.frame.hidden = true;
   p.empty.hidden = true;
@@ -221,7 +223,7 @@ function openVideo(p, src, rate, poster = '') {
   // Changing src resets playbackRate to the default, so set both.
   v.defaultPlaybackRate = v.playbackRate = rate;
   v.muted = prefs.muted;
-  v.play().catch(() => {});
+  if (autoplay) v.play().catch(() => {});
 }
 
 function closeVideo(p) {
@@ -232,19 +234,19 @@ function closeVideo(p) {
   v.removeAttribute('poster');
   v.load();
   v.hidden = true;
-  p.back.hidden = true;
   p.clip = null;
 }
 
 const isShare = (file) => file.startsWith('share/');
 
-function playClip(p, ev, force = false) {
+/** `lapse`: the clip came up in a timelapse, which picks up again after it ends. */
+function playClip(p, ev, force = false, lapse = false) {
   resetStage(p);
   if (isShare(ev.file) && !hevcOk && !force) return hevcNotice(p, ev);
   p.mode = 'clip';
   p.clip = ev;
+  p.lapse = lapse ? ev.t + ev.duration : null;
   openVideo(p, ev.file, prefs.rates.clip);
-  p.back.hidden = false;
   p.when.textContent = `${camName(p)} · ${fmtClock(ev.t)} · ${ev.kind === 'ding' ? 'Doorbell' : 'Motion'}`;
   setCursor(p, ev.t);
   renderTimeline(p);
@@ -252,11 +254,13 @@ function playClip(p, ev, force = false) {
   renderControls(p);
 }
 
+const playable = (e) => hevcOk || !isShare(e.file);
+
 /** This camera's next event after `cur`, skipping clips this browser can't play. */
 function nextClip(p, cur) {
   let next = null;
   for (const e of C.days[p.slug]?.events || []) {
-    if (isShare(e.file) && !hevcOk) continue;
+    if (!playable(e)) continue;
     const after = e.t > cur.t || (e.t === cur.t && e.file > cur.file);
     if (after && (!next || e.t < next.t || (e.t === next.t && e.file < next.file))) next = e;
   }
@@ -288,12 +292,46 @@ function showSummary(p) {
   if (!s) return;
   resetStage(p);
   p.mode = 'summary';
-  openVideo(p, s.video, prefs.rates.summary, s.poster);
-  p.back.hidden = false;
+  p.sumI = -1;
+  // It's long, so it waits on the poster for Play.
+  openVideo(p, s.video, prefs.rates.summary, s.poster, false);
   p.when.textContent = `${camName(p)} · ${dayLabel(s.date)} · daily summary`;
-  setCursor(p, null);
+  followSummary(p);
   renderEvents();
   renderControls(p);
+}
+
+/* The summary is the day's Reolink clips back to back, so a point in it maps to a clock time.
+ * Clip lengths are rounded to the second, so the offsets are scaled to the summary's real length. */
+function summaryScale(p) {
+  const evs = C.days[p.slug]?.events || [];
+  const total = evs.reduce((n, e) => n + e.duration, 0);
+  return { evs, k: total && p.video.duration ? p.video.duration / total : 1 };
+}
+
+/** Moves the cursor (and the lit event mark) along with the summary. */
+function followSummary(p) {
+  const { evs, k } = summaryScale(p);
+  if (!evs.length) return setCursor(p, null);
+  let at = (p.video.currentTime || 0) / k, i = 0;
+  while (i < evs.length - 1 && at >= evs[i].duration) at -= evs[i++].duration;
+  setCursor(p, evs[i].t + Math.min(at, evs[i].duration));
+  if (i === p.sumI) return;
+  p.sumI = i;
+  for (const b of p.lane.querySelectorAll('.marks b')) b.classList.toggle('on', +b.dataset.i === i);
+}
+
+/** Seeks the summary to clock time `t`: into the clip recording then, or the start of the nearest. */
+function seekSummary(p, t) {
+  const { evs, k } = summaryScale(p);
+  if (!evs.length || !p.video.duration) return;
+  const gap = (e) => (t < e.t ? e.t - t : Math.max(0, t - e.t - e.duration));
+  let best = 0;
+  for (let i = 1; i < evs.length; i++) if (gap(evs[i]) < gap(evs[best])) best = i;
+  let at = Math.max(0, Math.min(evs[best].duration, t - evs[best].t));
+  for (let i = 0; i < best; i++) at += evs[i].duration;
+  p.video.currentTime = Math.min(p.video.duration - 0.1, at * k);
+  followSummary(p);
 }
 
 /* ================= yesterday ================= */
@@ -400,18 +438,39 @@ function stopLive(p) {
 const rateKey = (p) => (p.mode === 'clip' ? 'clip' : p.mode === 'summary' ? 'summary' : 'timelapse');
 const isVideo = (p) => p.mode === 'clip' || p.mode === 'summary';
 
-function startTimelapse(p) {
+/** Plays the stills forward. An event it reaches plays as a clip, and the timelapse picks up
+ * again after the clip (`covered` is the clock time played so far; `from` resumes there). */
+function startTimelapse(p, from = null) {
   const s = stills(p);
   if (!s.length) return;
-  if (p.mode !== 'frame') showFrame(p, Math.max(0, p.pos));
-  // From the last still, start over.
-  if (p.pos >= s.length - 1) showFrame(p, 0);
+  if (from == null) {
+    if (p.mode !== 'frame') showFrame(p, Math.max(0, p.pos));
+    // From the last still, start over.
+    if (p.pos >= s.length - 1) showFrame(p, 0);
+  }
+  let covered = from ?? (p.pos === 0 ? 0 : s[p.pos].t);
   clearInterval(p.playing);
   p.playing = setInterval(() => {
-    if (p.pos >= stills(p).length - 1) return stopTimelapse(p);
+    const s = stills(p);
+    if (p.pos >= s.length - 1) return stopTimelapse(p);
+    const upTo = s[p.pos + 1].t;
+    const ev = (C.days[p.slug]?.events || [])
+      .filter((e) => e.t >= covered && e.t <= upTo && playable(e))
+      .sort((a, b) => a.t - b.t)[0];
+    if (ev) return playClip(p, { ...ev, slug: p.slug }, false, true);
     showFrame(p, p.pos + 1);
+    covered = upTo;
   }, 1000 / (BASE_FPS * prefs.rates.timelapse));
   renderControls(p);
+}
+
+/** After a timelapse's clip: back to the stills, from where the clip ended. */
+function resumeTimelapse(p) {
+  const t = p.lapse;
+  const s = stills(p);
+  if (!s.length) return backToTimeline(p);
+  showFrame(p, Math.max(0, s.findLastIndex((x) => x.t <= t)));
+  startTimelapse(p, t);
 }
 
 function stopTimelapse(p) {
@@ -431,8 +490,13 @@ function togglePlay(p) {
 function renderControls(p) {
   const playing = isVideo(p) ? !p.video.paused : Boolean(p.playing);
   p.play.disabled = p.mode === 'live' || p.mode === 'notice' || (p.mode === 'frame' && !stills(p).length);
-  p.play.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
-  p.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  // Only on a change: a timelapse repaints every frame, and swapping the icon under the pointer
+  // between press and release swallows the click.
+  if (p.playIcon !== playing) {
+    p.playIcon = playing;
+    p.play.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
+    p.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  }
   const r = prefs.rates[rateKey(p)];
   for (const b of p.rate.children) {
     b.setAttribute('aria-pressed', String(+b.dataset.r === r));
@@ -472,7 +536,7 @@ function renderTimeline(p) {
   const buckets = new Set(d.snapshots.map((s) => Math.floor(s.t / 600)));
   for (const e of d.events) for (let b = Math.floor(e.t / 600); b <= Math.floor(Math.min(86399, e.t + e.duration) / 600); b++) buckets.add(b);
   p.lane.querySelector('.density').innerHTML = [...buckets].map((b) => `<i style="left:${(b / 144) * 100}%;width:${100 / 144}%"></i>`).join('');
-  p.lane.querySelector('.marks').innerHTML = d.events.map((e, i) => `<b class="${e.kind}${p.clip?.file === e.file ? ' on' : ''}" data-i="${i}" title="${fmtClock(e.t)} · ${e.kind === 'ding' ? 'doorbell' : 'motion'}" style="left:${(e.t / 86400) * 100}%;width:${(e.duration / 86400) * 100}%"></b>`).join('');
+  p.lane.querySelector('.marks').innerHTML = d.events.map((e, i) => `<b class="${e.kind}${p.clip?.file === e.file || (p.mode === 'summary' && p.sumI === i) ? ' on' : ''}" data-i="${i}" title="${fmtClock(e.t)} · ${e.kind === 'ding' ? 'doorbell' : 'motion'}" style="left:${(e.t / 86400) * 100}%;width:${(e.duration / 86400) * 100}%"></b>`).join('');
 }
 
 function timeAt(p, clientX) {
@@ -482,6 +546,7 @@ function timeAt(p, clientX) {
 
 let dragging = null;
 function scrubTo(p, clientX) {
+  if (p.mode === 'summary') return seekSummary(p, timeAt(p, clientX));
   const s = stills(p);
   if (!s.length) return showEmpty(p);
   showFrame(p, nearest(s, timeAt(p, clientX)));
@@ -622,10 +687,15 @@ async function refreshStatus() {
 
 function wireVideo(p) {
   const v = p.video;
-  v.addEventListener('timeupdate', () => { if (p.mode === 'clip' && p.clip) setCursor(p, p.clip.t + v.currentTime); });
+  v.addEventListener('timeupdate', () => {
+    if (p.mode === 'clip' && p.clip) setCursor(p, p.clip.t + v.currentTime);
+    else if (p.mode === 'summary') followSummary(p);
+  });
+  v.addEventListener('loadedmetadata', () => { if (p.mode === 'summary') followSummary(p); });
   // Clips play on through the rest of the camera's day, oldest to newest, like a playlist.
   v.addEventListener('ended', () => {
     if (p.mode !== 'clip' || !p.clip) return;
+    if (p.lapse != null) return resumeTimelapse(p);
     const next = nextClip(p, p.clip);
     if (next) playClip(p, { ...next, slug: p.slug });
   });
@@ -633,9 +703,13 @@ function wireVideo(p) {
   v.addEventListener('pause', () => renderControls(p));
   v.addEventListener('volumechange', () => { prefs.muted = v.muted; savePrefs(); });
   // A browser without HEVC may play the audio over a blank picture rather than fail outright.
-  v.addEventListener('loadeddata', () => { if (p.mode === 'clip' && isShare(p.clip.file) && !v.videoWidth) hevcNotice(p, p.clip); });
+  v.addEventListener('loadeddata', () => {
+    if (p.mode !== 'clip' || !isShare(p.clip.file) || v.videoWidth) return;
+    p.lapse != null ? resumeTimelapse(p) : hevcNotice(p, p.clip);
+  });
   v.addEventListener('error', () => {
     if (p.mode !== 'clip' || !p.clip || !v.getAttribute('src')) return;
+    if (p.lapse != null) return resumeTimelapse(p);
     if (isShare(p.clip.file)) hevcNotice(p, p.clip);
     else showNotice(p, `<p>Couldn't play this clip.</p><p><button class="btn" data-act="back">Back to timeline</button></p>`);
   });
@@ -677,7 +751,8 @@ function wire() {
     if (!p) return;
     setFocus(p);
     const mark = e.target.closest('b[data-i]');
-    if (mark) return playClip(p, { ...C.days[p.slug].events[+mark.dataset.i], slug: p.slug });
+    // On the summary, the lane seeks it instead.
+    if (mark && p.mode !== 'summary') return playClip(p, { ...C.days[p.slug].events[+mark.dataset.i], slug: p.slug });
     dragging = p;
     lane.setPointerCapture(e.pointerId);
     stopTimelapse(p);

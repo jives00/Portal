@@ -345,7 +345,6 @@ body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturat
 .cam-over > * { pointer-events: auto; }
 .cam-when { background: rgba(0,0,0,.6); padding: 4px 9px; border-radius: 6px; font-size: 13px; }
 .cam-when:empty { display: none; }
-.cam-over .btn { background: rgba(0,0,0,.6); height: 30px; margin-left: auto; }
 .live-note { position: absolute; left: 10px; right: 10px; bottom: 56px; text-align: center; font-size: 12px; color: var(--ink-2); text-shadow: 0 1px 6px #000; pointer-events: none; }
 
 .cam-ctl { display: flex; align-items: center; gap: 10px; }
