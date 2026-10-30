@@ -336,13 +336,14 @@ function seekSummary(p, t) {
 
 /* ================= yesterday ================= */
 
-/** Every camera on yesterday: the daily summary where there is one, a timelapse of stills elsewhere. */
+/** Every camera on yesterday, paused at the start: the daily summary where there is one, the
+ * stills elsewhere. */
 async function showYesterday() {
   await setDate(yesterday(), { yest: true });
   if (!C.yest) return; // the day changed again while loading
   for (const p of C.panels) {
     if (summaryFor(p)) showSummary(p);
-    else if (stills(p).length) { showFrame(p, 0); startTimelapse(p); }
+    else if (stills(p).length) showFrame(p, 0);
   }
 }
 
