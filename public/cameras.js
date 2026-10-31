@@ -570,16 +570,28 @@ function eventsShown() {
     .sort((a, b) => b.t - a.t);
 }
 
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+/** People who came to the door across the Ring cameras showing, counted on the NAS after each clip. */
+function peopleLabel() {
+  const counted = shown().map((c) => C.days[c.slug]?.people).filter(Boolean);
+  if (!counted.length) return '';
+  const total = counted.reduce((n, p) => n + (p.total ?? 0), 0);
+  const pending = counted.some((p) => p.pending);
+  if (!total && pending) return ' · counting people…';
+  return ` · ${plural(total, 'person', 'people')}${pending ? ' so far' : ''}`;
+}
+
 function renderEvents() {
   const evs = eventsShown();
   const playing = new Set(C.panels.map((p) => p.clip?.file).filter(Boolean));
-  $('camCount').textContent = evs.length ? `${evs.length} on ${dayLabel(C.date)}` : '';
+  $('camCount').textContent = evs.length ? `${evs.length} on ${dayLabel(C.date)}${peopleLabel()}` : '';
   $('camEvents').innerHTML = evs.length
     ? evs.map((e) => {
         const thumb = thumbFor(e);
         return `<li><button class="ev ${e.kind} ${playing.has(e.file) ? 'on' : ''}" data-slug="${esc(e.slug)}" data-i="${e.i}">
           <span class="ev-thumb">${thumb ? `<img src="${esc(thumb)}" alt="" loading="lazy" decoding="async">` : ''}<span class="ev-dur">${fmtDur(e.duration)}</span></span>
-          <span class="ev-meta"><b><i class="ev-dot"></i>${fmtClock(e.t)}</b><small>${esc(camBy(e.slug)?.name ?? '')}${e.kind === 'ding' ? ' · Doorbell' : ''}</small></span></button></li>`;
+          <span class="ev-meta"><b><i class="ev-dot"></i>${fmtClock(e.t)}</b><small>${esc(camBy(e.slug)?.name ?? '')}${e.kind === 'ding' ? ' · Doorbell' : ''}${e.people ? ` · ${plural(e.people, 'person', 'people')}` : ''}</small></span></button></li>`;
       }).join('')
     : `<li class="empty">No events on ${dayLabel(C.date)}.</li>`;
 }

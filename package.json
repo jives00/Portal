@@ -14,6 +14,7 @@
     "@fastify/static": "^7",
     "fastify": "^4",
     "mqtt": "^5.16.1",
+    "onnxruntime-web": "1.31.1",
     "zod": "^3"
   },
   "devDependencies": {

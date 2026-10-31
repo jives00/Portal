@@ -5,6 +5,7 @@ import { FastifyInstance } from 'fastify';
 import { DayIndex, dayIndex, expired, listDays, sweep } from './library';
 import { LiveView } from './live';
 import { DAY_RE, dayPath, slugify } from './paths';
+import { PeopleCounter } from './people';
 import { ClipRecorder } from './recorder';
 import { Usage, discoverPrefixes, measure, parseReolink, reolinkDay, reolinkDays, sweepShare } from './reolink';
 import { RingBridge } from './ring';
@@ -79,6 +80,13 @@ export function cameras(app: FastifyInstance, opts: Options) {
   const summary = new CameraService(shareRoot, path.join(dataDir, 'camera'), log);
   const reolinkCache = path.join(dataDir, 'reolink');
   const thumbDir = path.join(dataDir, 'thumbs');
+  const people = new PeopleCounter({
+    footageRoot,
+    dir: path.join(dataDir, 'people'),
+    model: path.join(__dirname, '..', '..', 'models', 'yolox_nano.onnx'),
+    slugs: () => Object.values(settings.get().cameras).filter((c) => c.enabled).map((c) => c.slug),
+    log,
+  });
   const live = new Map<string, Live>();
   let usage: Usage | null = null;
   let measuring = false;
@@ -177,6 +185,7 @@ export function cameras(app: FastifyInstance, opts: Options) {
     for (const day of expired(listDays(thumbDir, ''), s.reolink.clipDays)) {
       fs.rmSync(path.join(thumbDir, dayPath('', day)), { recursive: true, force: true });
     }
+    people.sweep((days) => expired(days, s.eventDays));
     for (const name of readdirSafe(reolinkCache)) {
       const day = name.match(/(\d{4}-\d{2}-\d{2})\.json$/)?.[1];
       if (day && expired([day], s.reolink.clipDays).length) fs.rmSync(path.join(reolinkCache, name), { force: true });
@@ -244,6 +253,7 @@ export function cameras(app: FastifyInstance, opts: Options) {
             error: st.error,
           }
         : { none: true, processing: st.processing, error: st.error },
+      counting: people.current,
     };
   });
 
@@ -273,10 +283,12 @@ export function cameras(app: FastifyInstance, opts: Options) {
       cam.kind === 'ring'
         ? ['footage/', dayIndex(footageRoot, cam.slug, date)]
         : ['share/', await reolinkDay(shareRoot, cam.prefix, date, probe, reolinkCache)];
+    const counted = cam.kind === 'ring' && people.available ? people.forDay(cam.slug, date, day.events) : null;
     return {
       date,
       snapshots: day.snapshots.map((x) => ({ ...x, file: base + x.file })),
-      events: day.events.map((x) => ({ ...x, file: base + x.file })),
+      events: day.events.map((x) => ({ ...x, file: base + x.file, ...(counted && { people: counted.byFile[x.file] }) })),
+      ...(counted && { people: { total: counted.total, pending: counted.pending } }),
     };
   });
 
@@ -325,11 +337,13 @@ export function cameras(app: FastifyInstance, opts: Options) {
     start() {
       ring.start();
       summary.start();
+      people.start();
       runRetention();
       setInterval(runRetention, 3600_000).unref();
     },
     async shutdown() {
       ring.stop();
+      people.stop();
       liveView.stopAll();
       await Promise.all([...live.values()].map((l) => l.recorder.shutdown()));
     },
