@@ -30,6 +30,17 @@ export const ReolinkSchema = z.object({
   cameras: z.record(ReolinkCameraSchema),
 });
 
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Whether `now` (local time) falls in a continuous-recording window. */
+export function inWindow(w: { start: string; end: string }, now = new Date()): boolean {
+  const mins = (hhmm: string) => +hhmm.slice(0, 2) * 60 + +hhmm.slice(3);
+  const m = now.getHours() * 60 + now.getMinutes();
+  const [start, end] = [mins(w.start), mins(w.end)];
+  if (start === end) return true;
+  return start < end ? m >= start && m < end : m >= start || m < end;
+}
+
 export const SettingsSchema = z.object({
   snapshotDays: z.number().int().min(1).max(365),
   eventDays: z.number().int().min(1).max(730),
@@ -37,6 +48,12 @@ export const SettingsSchema = z.object({
   snapshotInterval: z.number().int().min(10).max(600),
   /** seconds each clip runs after its latest motion event or ding */
   clipLength: z.number().int().min(15).max(300),
+  /**
+   * Local hours the Ring stream stays open and records back to back, so nobody's arrival is
+   * missed. Ring pauses motion alerts while the stream is open. `end` before `start` crosses
+   * midnight; equal means all day.
+   */
+  continuous: z.object({ enabled: z.boolean(), start: z.string().regex(HHMM), end: z.string().regex(HHMM) }),
   /** keyed by Ring device id */
   cameras: z.record(CameraSchema),
   /** cameras that upload into the share's top-level YYYY/MM/DD folders */
@@ -52,6 +69,7 @@ export const DEFAULTS: Settings = {
   eventDays: 90,
   snapshotInterval: 30,
   clipLength: 60,
+  continuous: { enabled: true, start: '15:00', end: '23:00' },
   cameras: {},
   reolink: { clipDays: 90, summaryDays: 14, cameras: {} },
 };

@@ -875,8 +875,11 @@ export async function cameraSettings(P) {
         <label class="row"><span>Keep event clips</span><span>${num('eventDays', s.eventDays, 1, 730)} days</span></label>
         <label class="row"><span>Snapshot every</span><span>${num('snapshotInterval', s.snapshotInterval, 10, 600)} sec</span></label>
         <label class="row"><span>Record per event</span><span>${num('clipLength', s.clipLength, 15, 300)} sec</span></label>
+        <div class="row"><label style="display:flex;align-items:center;gap:10px"><input type="checkbox" class="switch" name="contOn" ${s.continuous.enabled ? 'checked' : ''}>Record continuously</label>
+          <span><input type="time" class="field" name="contStart" value="${esc(s.continuous.start)}" required aria-label="From"> to <input type="time" class="field" name="contEnd" value="${esc(s.continuous.end)}" required aria-label="Until"></span></div>
       </div>
-      <p class="note">Ring takes the snapshots and may not honor very short intervals. A doorbell press extends a clip. Live view pauses Ring's motion events, so nothing records while it's open.</p></section>
+      <p class="note">Ring takes the snapshots and may not honor very short intervals. A doorbell press extends a clip. Live view pauses Ring's motion events, so nothing records while it's open.</p>
+      <p class="note">Continuous recording keeps the stream open and saves back-to-back 5-minute clips, so arrivals aren't cut off. Ring's motion alerts pause during those hours.</p></section>
     <section><h3>Reolink</h3>
       <div class="list">${reo.map(([prefix, c]) => `<div class="li"><span class="grow"><input class="field" data-reo="${esc(prefix)}" value="${esc(c.name)}" maxlength="60" required aria-label="Camera name"><small>${esc(prefix)}_… uploads${used(c.slug)}</small></span></div>`).join('')
         || '<div class="li"><span class="grow note" style="margin:0">None yet. They appear once they upload to the share.</span></div>'}</div>
@@ -896,6 +899,7 @@ export async function cameraSettings(P) {
     delete next.usage;
     for (const k of ['snapshotDays', 'eventDays', 'snapshotInterval', 'clipLength']) next[k] = Number(f.elements[k].value);
     for (const k of ['clipDays', 'summaryDays']) next.reolink[k] = Number(f.elements[k].value);
+    next.continuous = { enabled: f.elements.contOn.checked, start: f.elements.contStart.value, end: f.elements.contEnd.value };
     for (const el of f.querySelectorAll('[data-ring]')) next.cameras[el.dataset.ring][el.dataset.f] = el.type === 'checkbox' ? el.checked : el.value.trim();
     for (const el of f.querySelectorAll('[data-reo]')) next.reolink.cameras[el.dataset.reo].name = el.value.trim();
     $('camSave').disabled = true;

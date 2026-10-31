@@ -9,7 +9,7 @@ import { PeopleCounter } from './people';
 import { ClipRecorder } from './recorder';
 import { Usage, discoverPrefixes, measure, parseReolink, reolinkDay, reolinkDays, sweepShare } from './reolink';
 import { RingBridge } from './ring';
-import { SettingsStore } from './settings';
+import { SettingsStore, inWindow } from './settings';
 import { SnapshotWriter } from './snapshots';
 import { CameraService, run } from './summary';
 
@@ -140,6 +140,13 @@ export function cameras(app: FastifyInstance, opts: Options) {
       log.warn(`${cam.slug}: couldn't save snapshot: ${(err as Error).message}`);
     }
   });
+
+  /** In the continuous window, keeps every online Ring camera recording back to back. */
+  function holdContinuous() {
+    const s = settings.get();
+    if (!s.continuous.enabled || !ring.connected || !inWindow(s.continuous)) return;
+    for (const [id, l] of live) if (enabled(id) && l.online !== false) l.recorder.hold();
+  }
 
   /** Adds any Reolink filename prefix seen on the share that isn't a camera yet. */
   function discoverReolink() {
@@ -338,6 +345,7 @@ export function cameras(app: FastifyInstance, opts: Options) {
       ring.start();
       summary.start();
       people.start();
+      setInterval(holdContinuous, 2000).unref();
       runRetention();
       setInterval(runRetention, 3600_000).unref();
     },

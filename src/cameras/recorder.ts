@@ -22,6 +22,8 @@ import { EventKind, clock, dayPath, eventName } from './paths';
 export const MAX_CLIP_MS = 5 * 60_000;
 /** Start the saved clip at the first keyframe at least this far in. */
 const SKIP_START_S = 1;
+/** After the stream fails, continuous recording waits this long before opening it again. */
+const RETRY_MS = 30_000;
 /** Shorter than this is a stream that never really started. */
 const MIN_BYTES = 32 * 1024;
 
@@ -86,6 +88,7 @@ export class ClipRecorder {
   private stopTimer?: NodeJS.Timeout;
   lastEvent: { at: number; kind: EventKind } | null = null;
   lastError: string | null = null;
+  private failedAt = 0;
 
   constructor(
     private opts: {
@@ -114,6 +117,21 @@ export class ClipRecorder {
     if (on) this.trigger('ding');
   }
 
+  /**
+   * Continuous recording (the evening window): keeps a clip going to the cap. Called every couple
+   * of seconds, so a new clip starts as soon as the last one ends. Ring sends no motion while the
+   * stream is open, so in the window this is the only thing that records.
+   */
+  hold() {
+    const now = this.now();
+    if (!this.clip) {
+      // Don't hammer Ring while the stream is failing.
+      if (now.getTime() - this.failedAt < RETRY_MS) return;
+      this.begin('motion', now);
+    }
+    this.extend(this.clip!.start.getTime() + MAX_CLIP_MS, now);
+  }
+
   async shutdown() {
     await this.finish();
   }
@@ -129,7 +147,11 @@ export class ClipRecorder {
     else if (kind === 'ding') this.clip.kind = 'ding';
 
     const clip = this.clip!;
-    const until = Math.min(clip.start.getTime() + MAX_CLIP_MS, now.getTime() + this.opts.clipLength() * 1000);
+    this.extend(Math.min(clip.start.getTime() + MAX_CLIP_MS, now.getTime() + this.opts.clipLength() * 1000), now);
+  }
+
+  private extend(until: number, now: Date) {
+    const clip = this.clip!;
     if (until > clip.stopAt) {
       clip.stopAt = until;
       clearTimeout(this.stopTimer);
@@ -157,6 +179,7 @@ export class ClipRecorder {
         if (code && this.clip?.proc === proc) {
           // ffmpeg quit on its own: the stream failed or Ring ended it.
           this.lastError = `ffmpeg exited ${code}: ${stderr.trim().split('\n').pop() ?? ''}`;
+          this.failedAt = this.now().getTime();
           this.opts.log.warn(`${this.opts.slug()}: ${this.lastError}`);
           void this.finish();
         }
@@ -164,6 +187,7 @@ export class ClipRecorder {
       });
       proc.on('error', (err) => {
         this.lastError = `Couldn't start ffmpeg: ${err.message}`;
+        this.failedAt = this.now().getTime();
         this.opts.log.warn(this.lastError);
         resolve();
       });

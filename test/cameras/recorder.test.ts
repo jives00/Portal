@@ -117,6 +117,48 @@ describe('ClipRecorder', () => {
     expect(events()).toEqual([`14-03-14_ding_${MAX_CLIP_MS / 1000 - 2}s.mp4`]);
   });
 
+  it('records back to back in the continuous window', async () => {
+    const ff = fakeFfmpeg();
+    const rec = make(ff);
+    const tick = async (ms: number) => {
+      for (let t = 0; t < ms; t += 2000) {
+        rec.hold();
+        await advance(2000);
+      }
+    };
+    await tick(MAX_CLIP_MS + 4000);
+    // The first clip is saved and the next is already recording.
+    expect(ff.spawned).toHaveLength(2);
+    expect(rec.recording).toBe(true);
+    expect(events().filter((n) => n.endsWith('.mp4'))).toEqual([`14-03-14_motion_${MAX_CLIP_MS / 1000 - 2}s.mp4`]);
+    expect(rec.lastEvent).toBeNull();
+  });
+
+  it('backs off when the stream fails in the continuous window', async () => {
+    const spawned: string[][] = [];
+    const failing = (_cmd: string, args: string[]) => {
+      spawned.push(args);
+      const proc = new EventEmitter() as any;
+      proc.exitCode = null;
+      proc.stdin = new PassThrough();
+      proc.stderr = new PassThrough();
+      setTimeout(() => {
+        proc.exitCode = 1;
+        proc.emit('close', 1);
+      }, 500);
+      return proc;
+    };
+    const rec = make({ spawn: failing, spawned } as any);
+    for (let i = 0; i < 10; i++) {
+      rec.hold();
+      await advance(2000);
+    }
+    expect(spawned).toHaveLength(1);
+    await advance(30_000);
+    rec.hold();
+    expect(spawned).toHaveLength(2);
+  });
+
   it('drops a clip that never got data', async () => {
     const rec = make(fakeFfmpeg(100));
     rec.motion(true);

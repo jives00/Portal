@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseCameraTopic, parseDiscovery } from '../../src/cameras/ring';
-import { SettingsStore } from '../../src/cameras/settings';
+import { SettingsStore, inWindow } from '../../src/cameras/settings';
 
 describe('ring topics', () => {
   it('parses entity and device-level topics', () => {
@@ -21,7 +21,34 @@ describe('ring topics', () => {
   });
 });
 
+describe('inWindow', () => {
+  const at = (h: number, m = 0) => new Date(2026, 9, 31, h, m);
+  it('covers start up to but not including end', () => {
+    const w = { start: '15:00', end: '23:00' };
+    expect(inWindow(w, at(14, 59))).toBe(false);
+    expect(inWindow(w, at(15))).toBe(true);
+    expect(inWindow(w, at(22, 59))).toBe(true);
+    expect(inWindow(w, at(23))).toBe(false);
+  });
+
+  it('crosses midnight, and equal times mean all day', () => {
+    const w = { start: '22:00', end: '06:00' };
+    expect(inWindow(w, at(23))).toBe(true);
+    expect(inWindow(w, at(5, 59))).toBe(true);
+    expect(inWindow(w, at(12))).toBe(false);
+    expect(inWindow({ start: '00:00', end: '00:00' }, at(12))).toBe(true);
+  });
+});
+
 describe('SettingsStore', () => {
+  it('gives an older settings file the default continuous window', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentry-old-'));
+    const file = path.join(dir, 'cameras.json');
+    fs.writeFileSync(file, JSON.stringify({ snapshotDays: 30, eventDays: 90, snapshotInterval: 30, clipLength: 300, cameras: {} }));
+    expect(new SettingsStore(file).get()).toMatchObject({ clipLength: 300, continuous: { enabled: true, start: '15:00', end: '23:00' } });
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   let dir: string;
   beforeEach(() => (dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentry-set-'))));
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
