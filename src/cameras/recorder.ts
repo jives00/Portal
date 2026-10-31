@@ -22,8 +22,12 @@ import { EventKind, clock, dayPath, eventName } from './paths';
 export const MAX_CLIP_MS = 5 * 60_000;
 /** Start the saved clip at the first keyframe at least this far in. */
 const SKIP_START_S = 1;
-/** After the stream fails, continuous recording waits this long before opening it again. */
-const RETRY_MS = 30_000;
+/**
+ * After the stream fails, continuous recording waits this long before opening it again: briefly at
+ * first (a reconnect sometimes gets a 404 while ring-mqtt is still closing the last session), then
+ * longer so a real outage doesn't hammer Ring.
+ */
+const RETRY_MS = [3_000, 10_000, 30_000];
 /** Shorter than this is a stream that never really started. */
 const MIN_BYTES = 32 * 1024;
 
@@ -89,6 +93,8 @@ export class ClipRecorder {
   lastEvent: { at: number; kind: EventKind } | null = null;
   lastError: string | null = null;
   private failedAt = 0;
+  /** stream failures since the last saved clip */
+  private failures = 0;
 
   constructor(
     private opts: {
@@ -126,10 +132,16 @@ export class ClipRecorder {
     const now = this.now();
     if (!this.clip) {
       // Don't hammer Ring while the stream is failing.
-      if (now.getTime() - this.failedAt < RETRY_MS) return;
+      const wait = this.failures ? RETRY_MS[Math.min(this.failures, RETRY_MS.length) - 1] : 0;
+      if (now.getTime() - this.failedAt < wait) return;
       this.begin('motion', now);
     }
     this.extend(this.clip!.start.getTime() + MAX_CLIP_MS, now);
+  }
+
+  private failed() {
+    this.failedAt = this.now().getTime();
+    this.failures++;
   }
 
   async shutdown() {
@@ -179,7 +191,7 @@ export class ClipRecorder {
         if (code && this.clip?.proc === proc) {
           // ffmpeg quit on its own: the stream failed or Ring ended it.
           this.lastError = `ffmpeg exited ${code}: ${stderr.trim().split('\n').pop() ?? ''}`;
-          this.failedAt = this.now().getTime();
+          this.failed();
           this.opts.log.warn(`${this.opts.slug()}: ${this.lastError}`);
           void this.finish();
         }
@@ -187,7 +199,7 @@ export class ClipRecorder {
       });
       proc.on('error', (err) => {
         this.lastError = `Couldn't start ffmpeg: ${err.message}`;
-        this.failedAt = this.now().getTime();
+        this.failed();
         this.opts.log.warn(this.lastError);
         resolve();
       });
@@ -232,7 +244,11 @@ export class ClipRecorder {
       const final = path.join(clip.dir, eventName(start, clip.kind, seconds - skipped));
       fs.renameSync(out, final);
       fs.rmSync(clip.tmp, { force: true });
-      this.lastError = null;
+      // The next clip may already have failed while this one was being remuxed; keep that.
+      if (this.failedAt < clip.start.getTime()) {
+        this.lastError = null;
+        this.failures = 0;
+      }
       this.opts.log.info(`${this.opts.slug()}: saved ${path.basename(final)}`);
     } catch (err) {
       // Keep the raw recording (as .ts, which the viewer ignores) so nothing is lost.

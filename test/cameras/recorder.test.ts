@@ -149,14 +149,26 @@ describe('ClipRecorder', () => {
       return proc;
     };
     const rec = make({ spawn: failing, spawned } as any);
-    for (let i = 0; i < 10; i++) {
-      rec.hold();
-      await advance(2000);
-    }
+    const tick = async (ms: number) => {
+      for (let t = 0; t < ms; t += 1000) {
+        rec.hold();
+        await advance(1000);
+      }
+    };
+    // Fails at 0.5 s; retries 3 s later, then 10 s, then every 30 s.
+    await tick(1000);
     expect(spawned).toHaveLength(1);
-    await advance(30_000);
-    rec.hold();
+    await tick(4000);
     expect(spawned).toHaveLength(2);
+    await tick(9000);
+    expect(spawned).toHaveLength(2);
+    await tick(2000);
+    expect(spawned).toHaveLength(3);
+    await tick(29_000);
+    expect(spawned).toHaveLength(3);
+    await tick(2000);
+    expect(spawned).toHaveLength(4);
+    expect(rec.lastError).toMatch(/exited 1/);
   });
 
   it('drops a clip that never got data', async () => {

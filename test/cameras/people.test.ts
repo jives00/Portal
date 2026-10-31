@@ -58,6 +58,13 @@ describe('arrivals', () => {
     expect(clipPeople(counts)).toEqual({ people: 5, first: 1, last: 2 });
   });
 
+  it('smooths by the rate the counts were taken at', () => {
+    // A two-sample dropout is a real gap at 1 fps, but flicker at 2 fps.
+    const counts = [1, 1, 1, 0, 0, 1, 1, 1];
+    expect(clipPeople(counts, 1).people).toBe(2);
+    expect(clipPeople(counts, 2).people).toBe(1);
+  });
+
   it('is zero for an empty clip', () => {
     expect(clipPeople([])).toEqual({ people: 0, first: 0, last: 0 });
     expect(clipPeople([0, 0, 0])).toEqual({ people: 0, first: 0, last: 0 });

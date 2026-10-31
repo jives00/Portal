@@ -19,8 +19,11 @@ import { isoDay } from './paths';
  * processed; the worker runs one at a time under nice.
  */
 
-/** Frames sampled per second of video. */
-export const FPS = 2;
+/**
+ * Frames sampled per second of video. 2 fell behind real time on the NAS once continuous clips
+ * arrived back to back; a visitor at the door is in view far longer than a second.
+ */
+export const FPS = 1;
 /** Detector input size; the YOLOX-nano release model is 416×416. */
 export const SIZE = 416;
 /** Bump when the detector or its inputs change so saved counts are redone. */
@@ -30,8 +33,8 @@ const MIN_SCORE = 0.4;
 const NMS_IOU = 0.45;
 /** Shorter than this share of the frame is someone out on the sidewalk or street. */
 const MIN_HEIGHT = 0.15;
-/** Frames in the median window: 2.5 s at 2 fps. */
-const SMOOTH = 5;
+/** Median window, in frames, for a clip sampled at `fps`: about 2.5 s, odd, at least 3. */
+const smoothWindow = (fps: number) => Math.max(3, Math.round(2.5 * fps) | 1);
 /** A clip starting this soon after the last one ended may still show the same people. */
 const CARRY_S = 20;
 
@@ -79,7 +82,7 @@ export function countPeople(out: Float32Array, imageHeight: number, size = SIZE)
 }
 
 /** Running median, so one missed or doubled frame doesn't look like someone coming or going. */
-export function smooth(counts: number[], window = SMOOTH): number[] {
+export function smooth(counts: number[], window = smoothWindow(FPS)): number[] {
   const half = Math.floor(window / 2);
   return counts.map((_, i) => {
     const w = counts.slice(Math.max(0, i - half), i + half + 1).sort((a, b) => a - b);
@@ -95,8 +98,9 @@ export interface ClipPeople {
   last: number;
 }
 
-export function clipPeople(counts: number[]): ClipPeople {
-  const s = smooth(counts);
+/** `fps` is the rate the counts were sampled at; older saved counts were taken at 2. */
+export function clipPeople(counts: number[], fps = FPS): ClipPeople {
+  const s = smooth(counts, smoothWindow(fps));
   let people = s[0] ?? 0;
   for (let i = 1; i < s.length; i++) people += Math.max(0, s[i] - s[i - 1]);
   return { people, first: s[0] ?? 0, last: s.at(-1) ?? 0 };
@@ -194,7 +198,7 @@ export class PeopleCounter {
       const s = saved[path.basename(e.file)];
       if (s?.version !== MODEL_VERSION) pending = true;
       if (s?.counts && s.version === MODEL_VERSION) {
-        const c = clipPeople(s.counts);
+        const c = clipPeople(s.counts, s.fps);
         clips.push({ ...c, t: e.t, duration: e.duration });
         byFile[e.file] = c.people;
       } else {
