@@ -134,7 +134,7 @@ export class ClipRecorder {
       // Don't hammer Ring while the stream is failing.
       const wait = this.failures ? RETRY_MS[Math.min(this.failures, RETRY_MS.length) - 1] : 0;
       if (now.getTime() - this.failedAt < wait) return;
-      this.begin('motion', now);
+      this.begin('continuous', now);
     }
     this.extend(this.clip!.start.getTime() + MAX_CLIP_MS, now);
   }

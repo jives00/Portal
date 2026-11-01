@@ -247,7 +247,7 @@ function playClip(p, ev, force = false, lapse = false) {
   p.clip = ev;
   p.lapse = lapse ? ev.t + ev.duration : null;
   openVideo(p, ev.file, prefs.rates.clip);
-  p.when.textContent = `${camName(p)} · ${fmtClock(ev.t)} · ${ev.kind === 'ding' ? 'Doorbell' : 'Motion'}`;
+  p.when.textContent = `${camName(p)} · ${fmtClock(ev.t)} · ${KINDS[ev.kind] ?? 'Motion'}`;
   setCursor(p, ev.t);
   renderTimeline(p);
   renderEvents();
@@ -537,7 +537,7 @@ function renderTimeline(p) {
   const buckets = new Set(d.snapshots.map((s) => Math.floor(s.t / 600)));
   for (const e of d.events) for (let b = Math.floor(e.t / 600); b <= Math.floor(Math.min(86399, e.t + e.duration) / 600); b++) buckets.add(b);
   p.lane.querySelector('.density').innerHTML = [...buckets].map((b) => `<i style="left:${(b / 144) * 100}%;width:${100 / 144}%"></i>`).join('');
-  p.lane.querySelector('.marks').innerHTML = d.events.map((e, i) => `<b class="${e.kind}${p.clip?.file === e.file || (p.mode === 'summary' && p.sumI === i) ? ' on' : ''}" data-i="${i}" title="${fmtClock(e.t)} · ${e.kind === 'ding' ? 'doorbell' : 'motion'}" style="left:${(e.t / 86400) * 100}%;width:${(e.duration / 86400) * 100}%"></b>`).join('');
+  p.lane.querySelector('.marks').innerHTML = d.events.map((e, i) => `<b class="${e.kind}${p.clip?.file === e.file || (p.mode === 'summary' && p.sumI === i) ? ' on' : ''}" data-i="${i}" title="${fmtClock(e.t)} · ${(KINDS[e.kind] ?? 'Motion').toLowerCase()}" style="left:${(e.t / 86400) * 100}%;width:${(e.duration / 86400) * 100}%"></b>`).join('');
 }
 
 function timeAt(p, clientX) {
@@ -571,6 +571,7 @@ function eventsShown() {
 }
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const KINDS = { ding: 'Doorbell', motion: 'Motion', continuous: 'Continuous' };
 
 /** People who came to the door across the Ring cameras showing, counted on the NAS after each clip. */
 function peopleLabel() {
@@ -591,7 +592,7 @@ function renderEvents() {
         const thumb = thumbFor(e);
         return `<li><button class="ev ${e.kind} ${playing.has(e.file) ? 'on' : ''}" data-slug="${esc(e.slug)}" data-i="${e.i}">
           <span class="ev-thumb">${thumb ? `<img src="${esc(thumb)}" alt="" loading="lazy" decoding="async">` : ''}<span class="ev-dur">${fmtDur(e.duration)}</span></span>
-          <span class="ev-meta"><b><i class="ev-dot"></i>${fmtClock(e.t)}</b><small>${esc(camBy(e.slug)?.name ?? '')}${e.kind === 'ding' ? ' · Doorbell' : ''}${e.people ? ` · ${plural(e.people, 'person', 'people')}` : ''}</small></span></button></li>`;
+          <span class="ev-meta"><b><i class="ev-dot"></i>${fmtClock(e.t)}</b><small>${esc(camBy(e.slug)?.name ?? '')}${e.kind === 'motion' ? '' : ` · ${KINDS[e.kind] ?? ''}`}${e.people ? ` · ${plural(e.people, 'person', 'people')}` : ''}</small></span></button></li>`;
       }).join('')
     : `<li class="empty">No events on ${dayLabel(C.date)}.</li>`;
 }
@@ -685,6 +686,7 @@ async function refreshStatus() {
     if (c.online === false) issues.push(`${c.name} is offline`);
     if (c.error) issues.push(`${c.name}: ${c.error}`);
   }
+  if (s.lowDisk) issues.push('Continuous recording paused: under 100 GB free on the share');
   if (s.summary?.error) issues.push(s.summary.error);
   $('camStatus').className = `cam-status ${rec.length ? 'rec' : issues.length ? 'bad' : 'ok'}`;
   $('camStatus').textContent = rec.length ? `Recording ${rec.map((c) => c.name).join(', ')}` : issues.length ? 'Problem' : '';
@@ -872,14 +874,14 @@ export async function cameraSettings(P) {
         || '<div class="li"><span class="grow note" style="margin:0">None yet. They appear once ring-mqtt reports them.</span></div>'}</div>
       <div class="setrows">
         <label class="row"><span>Keep snapshots</span><span>${num('snapshotDays', s.snapshotDays, 1, 365)} days</span></label>
-        <label class="row"><span>Keep event clips</span><span>${num('eventDays', s.eventDays, 1, 730)} days</span></label>
+        <label class="row"><span>Keep clips</span><span>${num('eventDays', s.eventDays, 1, 730)} days</span></label>
         <label class="row"><span>Snapshot every</span><span>${num('snapshotInterval', s.snapshotInterval, 10, 600)} sec</span></label>
         <label class="row"><span>Record per event</span><span>${num('clipLength', s.clipLength, 15, 300)} sec</span></label>
         <div class="row"><label style="display:flex;align-items:center;gap:10px"><input type="checkbox" class="switch" name="contOn" ${s.continuous.enabled ? 'checked' : ''}>Record continuously</label>
           <span><input type="time" class="field" name="contStart" value="${esc(s.continuous.start)}" required aria-label="From"> to <input type="time" class="field" name="contEnd" value="${esc(s.continuous.end)}" required aria-label="Until"></span></div>
       </div>
       <p class="note">Ring takes the snapshots and may not honor very short intervals. A doorbell press extends a clip. Live view pauses Ring's motion events, so nothing records while it's open.</p>
-      <p class="note">Continuous recording keeps the stream open and saves back-to-back 5-minute clips, so arrivals aren't cut off. Ring's motion alerts pause during those hours.</p></section>
+      <p class="note">Continuous recording keeps the stream open and saves back-to-back 5-minute clips, so arrivals aren't cut off. Ring's motion alerts pause during those hours, it drains a battery doorbell (about 14% an hour), and it pauses if the share drops under 100 GB free. Keep clips covers these too.</p></section>
     <section><h3>Reolink</h3>
       <div class="list">${reo.map(([prefix, c]) => `<div class="li"><span class="grow"><input class="field" data-reo="${esc(prefix)}" value="${esc(c.name)}" maxlength="60" required aria-label="Camera name"><small>${esc(prefix)}_… uploads${used(c.slug)}</small></span></div>`).join('')
         || '<div class="li"><span class="grow note" style="margin:0">None yet. They appear once they upload to the share.</span></div>'}</div>

@@ -7,7 +7,8 @@ import path from 'node:path';
  * All times are local (the container runs with TZ=America/Chicago).
  */
 
-export type EventKind = 'motion' | 'ding';
+/** `continuous`: a clip from the continuous window, not set off by anything. */
+export type EventKind = 'motion' | 'ding' | 'continuous';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -27,7 +28,7 @@ export function dayPath(camera: string, day: Date | string): string {
 export const eventName = (start: Date, kind: EventKind, seconds: number) =>
   `${clock(start)}_${kind}_${Math.max(1, Math.round(seconds))}s.mp4`;
 
-const EVENT_RE = /^(\d{2})-(\d{2})-(\d{2})_(motion|ding)_(\d+)s\.mp4$/;
+const EVENT_RE = /^(\d{2})-(\d{2})-(\d{2})_(motion|ding|continuous)_(\d+)s\.mp4$/;
 const SNAPSHOT_RE = /^(\d{2})-(\d{2})-(\d{2})(?:-\d+)?\.jpg$/;
 
 /** Seconds since local midnight, kind and length, from an event clip's filename. */

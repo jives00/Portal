@@ -10,6 +10,7 @@ describe('filenames', () => {
     const name = eventName(new Date(2026, 9, 24, 14, 3, 12), 'ding', 46.6);
     expect(name).toBe('14-03-12_ding_47s.mp4');
     expect(parseEvent(name)).toEqual({ t: 14 * 3600 + 3 * 60 + 12, kind: 'ding', duration: 47 });
+    expect(parseEvent('20-29-51_continuous_298s.mp4')?.kind).toBe('continuous');
   });
 
   it('ignores in-progress and foreign files', () => {

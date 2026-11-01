@@ -130,7 +130,7 @@ describe('ClipRecorder', () => {
     // The first clip is saved and the next is already recording.
     expect(ff.spawned).toHaveLength(2);
     expect(rec.recording).toBe(true);
-    expect(events().filter((n) => n.endsWith('.mp4'))).toEqual([`14-03-14_motion_${MAX_CLIP_MS / 1000 - 2}s.mp4`]);
+    expect(events().filter((n) => n.endsWith('.mp4'))).toEqual([`14-03-14_continuous_${MAX_CLIP_MS / 1000 - 2}s.mp4`]);
     expect(rec.lastEvent).toBeNull();
   });
 

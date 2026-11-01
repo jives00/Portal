@@ -39,6 +39,13 @@ interface Live {
 }
 
 const fallbackName = (id: string) => `Ring camera ${id.slice(-4)}`;
+/** Free space on the share below which continuous recording pauses. */
+const MIN_FREE = 100e9;
+/**
+ * People counting was built for Halloween 2026 and is off since. Saved counts still show on the
+ * days that have them; set this to count new clips again.
+ */
+const COUNT_PEOPLE = false;
 
 const readdirSafe = (dir: string) => {
   try {
@@ -90,6 +97,7 @@ export function cameras(app: FastifyInstance, opts: Options) {
   const live = new Map<string, Live>();
   let usage: Usage | null = null;
   let measuring = false;
+  let lowDisk = false;
 
   function liveFor(id: string): Live {
     let entry = live.get(id);
@@ -144,7 +152,7 @@ export function cameras(app: FastifyInstance, opts: Options) {
   /** In the continuous window, keeps every online Ring camera recording back to back. */
   function holdContinuous() {
     const s = settings.get();
-    if (!s.continuous.enabled || !ring.connected || !inWindow(s.continuous)) return;
+    if (!s.continuous.enabled || !ring.connected || !inWindow(s.continuous) || lowDisk) return;
     for (const [id, l] of live) if (enabled(id) && l.online !== false) l.recorder.hold();
   }
 
@@ -169,6 +177,21 @@ export function cameras(app: FastifyInstance, opts: Options) {
       .then((u) => (usage = u))
       .catch((err) => log.warn(`Couldn't measure disk use: ${(err as Error).message}`))
       .finally(() => (measuring = false));
+  }
+
+  /**
+   * Continuous recording is a few GB a day and shares the volume with the Reolink and the DSM
+   * summary task, so it pauses when free space runs low. Ordinary event clips carry on.
+   */
+  function checkFree() {
+    fs.promises
+      .statfs(footageRoot)
+      .then((st) => {
+        const low = st.bavail * st.bsize < MIN_FREE;
+        if (low !== lowDisk) log[low ? 'warn' : 'info'](`Continuous recording ${low ? 'paused: under' : 'resumed: over'} ${MIN_FREE / 1e9} GB free`);
+        lowDisk = low;
+      })
+      .catch((err) => log.warn(`Couldn't check free space: ${(err as Error).message}`));
   }
 
   function runRetention() {
@@ -229,6 +252,7 @@ export function cameras(app: FastifyInstance, opts: Options) {
     const st = summary.status();
     return {
       mqtt: ring.connected,
+      lowDisk: s.continuous.enabled && lowDisk,
       cameras: [
         ...Object.entries(s.cameras)
           .filter(([, cam]) => cam.enabled)
@@ -290,7 +314,8 @@ export function cameras(app: FastifyInstance, opts: Options) {
       cam.kind === 'ring'
         ? ['footage/', dayIndex(footageRoot, cam.slug, date)]
         : ['share/', await reolinkDay(shareRoot, cam.prefix, date, probe, reolinkCache)];
-    const counted = cam.kind === 'ring' && people.available ? people.forDay(cam.slug, date, day.events) : null;
+    let counted = cam.kind === 'ring' && people.available ? people.forDay(cam.slug, date, day.events) : null;
+    if (counted && !COUNT_PEOPLE) counted = counted.total === null ? null : { ...counted, pending: false };
     return {
       date,
       snapshots: day.snapshots.map((x) => ({ ...x, file: base + x.file })),
@@ -344,7 +369,9 @@ export function cameras(app: FastifyInstance, opts: Options) {
     start() {
       ring.start();
       summary.start();
-      people.start();
+      if (COUNT_PEOPLE) people.start();
+      checkFree();
+      setInterval(checkFree, 60_000).unref();
       setInterval(holdContinuous, 2000).unref();
       runRetention();
       setInterval(runRetention, 3600_000).unref();

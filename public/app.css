@@ -367,6 +367,7 @@ body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturat
 .lane .marks { position: absolute; left: 0; right: 0; top: 15px; bottom: 8px; }
 .lane .marks b { position: absolute; top: 0; bottom: 0; min-width: 4px; border-radius: 2px; background: var(--warn); cursor: pointer; }
 .lane .marks b.ding { background: var(--live); }
+.lane .marks b.continuous { background: var(--ink-3); }
 .lane .marks b.on { box-shadow: 0 0 0 2px var(--ink); }
 .timeline .cursor { position: absolute; top: 16px; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); box-shadow: 0 0 6px rgba(0,0,0,.8); pointer-events: none; }
 @container (max-width: 560px) { .timeline .hours span:nth-child(odd) { color: transparent; } }
@@ -385,6 +386,7 @@ body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturat
 .ev-meta small { color: var(--ink-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ev-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); flex: none; }
 .ev.ding .ev-dot { background: var(--live); }
+.ev.continuous .ev-dot { background: var(--ink-3); }
 
 /* camera settings */
 .field.num { flex: none; width: 74px; text-align: right; }
