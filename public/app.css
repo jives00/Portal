@@ -304,10 +304,10 @@ a.game:hover, a.quote:hover { background: rgba(255,255,255,.05); }
 .views a:hover { color: var(--ink); background: rgba(255,255,255,.08); }
 .views a[aria-current="page"] { color: var(--ink); background: rgba(255,255,255,.16); }
 
-body[data-view="cameras"] :is(.hero, .dock, .cards, .foot, #nextPhoto, #favPhoto, #banPhoto, .photo-ctl .sep) { display: none !important; }
-body[data-view="cameras"] .photo-ctl { opacity: 1; }
-/* Footage reads better without a busy photo behind it: keep the photo's color, lose its detail. */
-body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturate(.8); transform: scale(1.1); }
+body:is([data-view="cameras"], [data-view="devdash"]) :is(.hero, .dock, .cards, .foot, #nextPhoto, #favPhoto, #banPhoto, .photo-ctl .sep) { display: none !important; }
+body:is([data-view="cameras"], [data-view="devdash"]) .photo-ctl { opacity: 1; }
+/* Footage and status read better without a busy photo behind them: keep the photo's color, lose its detail. */
+body:is([data-view="cameras"], [data-view="devdash"]) .bg .photo { filter: blur(34px) brightness(.3) saturate(.8); transform: scale(1.1); }
 .bg .photo { transition: opacity .2s ease, filter .4s ease; }
 
 /* ---------- cameras ---------- */
@@ -408,3 +408,49 @@ body[data-view="cameras"] .bg .photo { filter: blur(34px) brightness(.3) saturat
   .lane .marks b { min-width: 6px; }
   #camEvents { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- devdash ---------- */
+.dev { display: flex; flex-direction: column; gap: 12px; margin-top: 46px; min-width: 0; padding-bottom: 24px; }
+.dev .cam-bar a.btn { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
+.dd-h { margin: 14px 0 0; font: 600 13px/1 var(--f-display); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+.dd-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.dd-infra { gap: 10px; }
+.dev .card { animation: none; }
+.dd-card { gap: 12px; }
+.dd-card.bad { border-color: rgba(255, 75, 75, .45); }
+.dd-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.dd-head h2 { margin: 0; font: 600 19px/1 var(--f-display); letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dev .sp { flex: 1; }
+.dd-badge { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 3px 7px; border-radius: 6px; font-size: 11.5px; font-weight: 500;
+  color: var(--ink-2); background: rgba(255,255,255,.07); border: 1px solid var(--line); }
+.dd-badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
+.dd-badge.ok { color: #9ff0c2; background: rgba(61,220,132,.12); border-color: rgba(61,220,132,.3); }
+.dd-badge.ok i { background: var(--ok); }
+.dd-badge.down { color: #ffb4ab; background: rgba(255,75,75,.13); border-color: rgba(255,75,75,.32); }
+.dd-badge.down i { background: var(--live); }
+.dd-badge.warn { color: #ffd98a; background: rgba(240,180,41,.13); border-color: rgba(240,180,41,.32); }
+.dd-badge.warn i { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
+.dd-errs { flex: none; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; color: #ffb4ab; background: rgba(255,75,75,.16); border: 1px solid rgba(255,75,75,.3); }
+.dd-link { flex: none; font-size: 12.5px; color: var(--ink-2); text-decoration: none; }
+.dd-link:hover { color: var(--ink); text-decoration: underline; }
+.dd-health { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; }
+.dd-health.ok b { color: var(--ok); font-weight: 600; }
+.dd-health.down b { color: #ffb4ab; font-weight: 600; }
+.dd-health span, .dev .dim { color: var(--ink-3); }
+.dev .warn { color: var(--warn); }
+.dev .ok { color: var(--ok); }
+.dev .down, .dd-err { color: #ffb4ab; word-break: break-all; }
+.dd-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.dd-rows li, .dd-row, .dd-oneshot { display: flex; align-items: center; gap: 10px; font-size: 12.5px; min-width: 0; }
+.dev code { font: 12.5px/1.3 ui-monospace, 'Cascadia Mono', Consolas, monospace; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.dd-row { flex-direction: row; padding: 11px 14px; flex-wrap: wrap; }
+.dd-row b { font-weight: 600; font-size: 13.5px; }
+.dd-oneshot { gap: 8px; color: var(--ink-2); }
+.dd-lasterr, .dd-logs { margin: 0; font: 12px/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: pre-wrap; word-break: break-all; border-radius: 8px; padding: 8px 10px; }
+.dd-lasterr { color: #ffb4ab; background: rgba(120,20,20,.3); border: 1px solid rgba(255,75,75,.22); }
+.dd-logs { color: var(--ink-2); background: rgba(0,0,0,.38); max-height: 150px; overflow-y: auto; }
+.dd-toggle { align-self: flex-start; background: none; border: 0; padding: 0; font-size: 12.5px; color: var(--ink-3); }
+.dd-toggle:hover { color: var(--ink); }
+.dd-last { font: 12px/1.4 ui-monospace, 'Cascadia Mono', Consolas, monospace; color: var(--ink-3); word-break: break-all; }
+@media (max-width: 1100px) { .dd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .dd-grid { grid-template-columns: minmax(0, 1fr); } .dev { margin-top: 0; } }

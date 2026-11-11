@@ -3,6 +3,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify, { FastifyError } from 'fastify';
 import { ZodError } from 'zod';
 import { cameras } from './cameras';
+import { devdash } from './devdash';
 import { UpstreamError } from './http';
 import { PhotoService } from './photos';
 import { getQuote, getQuotes, resolveSymbol } from './quotes';
@@ -14,6 +15,8 @@ const PORT = Number(process.env.PORT ?? 3012);
 const DATA_DIR = path.resolve(process.env.DATA_DIR ?? 'data');
 const CAMERA_ROOT = path.resolve(process.env.CAMERA_ROOT ?? '/cameras');
 const NAS_HOST = process.env.NAS_HOST ?? '192.168.0.105';
+// DevDash's API, read by the DevDash tab. The container can't resolve `synology`, so default to the LAN IP.
+const DEVDASH_URL = process.env.DEVDASH_URL ?? `http://${NAS_HOST}:3005`;
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' } });
 const log = {
@@ -22,6 +25,7 @@ const log = {
 };
 
 const settings = new SettingsStore(path.join(DATA_DIR, 'settings.json'), log);
+const dash = devdash(DEVDASH_URL);
 const photos = new PhotoService(process.env.UNSPLASH_ACCESS_KEY || undefined, log);
 const cams = cameras(app, {
   shareRoot: CAMERA_ROOT,
@@ -75,6 +79,8 @@ app.get<{ Querystring: { league?: string } }>('/api/sports/teams', async (req, r
 });
 
 app.get('/api/status', async () => linkStatuses(settings.get().links.map((l) => l.url), NAS_HOST));
+
+app.get('/api/devdash', async () => dash.get());
 
 async function shutdown() {
   await cams.shutdown();

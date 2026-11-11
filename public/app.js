@@ -4,6 +4,7 @@
  * cameras.js. */
 
 import { cameraKey, cameraSettings, hideCameras, initCameras, showCameras } from './cameras.js';
+import { devdashKey, hideDevdash, initDevdash, showDevdash } from './devdash.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -754,6 +755,12 @@ document.addEventListener('keydown', (e) => {
     if (e.key === ',') { e.preventDefault(); openSettings(); }
     return;
   }
+  if (view === 'devdash') {
+    if (devdashKey(e)) return;
+    if (e.key === '?') { e.preventDefault(); $('keys').hidden = false; }
+    if (e.key === ',') { e.preventDefault(); openSettings(); }
+    return;
+  }
   if (/^[1-9]$/.test(e.key)) { e.preventDefault(); openLink(+e.key - 1, e.shiftKey); return; }
   if (e.key === '?') { e.preventDefault(); $('keys').hidden = false; return; }
   if (/^[a-z]$/i.test(e.key) && dockVisible()) { e.preventDefault(); filterText += e.key; renderDock(); return; }
@@ -767,23 +774,30 @@ document.addEventListener('keydown', (e) => {
 $('keys').onclick = () => ($('keys').hidden = true);
 
 /* ================= pages ================= */
-// Home and Cameras, picked by the URL hash so each can be bookmarked (#cameras).
+// Home, Cameras and DevDash, picked by the URL hash so each can be bookmarked (#cameras, #devdash).
 let view = 'home';
-const viewFromHash = () => (location.hash === '#cameras' ? 'cameras' : 'home');
+const VIEWS = { cameras: 'Cameras', devdash: 'DevDash' };
+const viewFromHash = () => { const v = location.hash.slice(1); return VIEWS[v] ? v : 'home'; };
 function setView(next) {
   document.body.dataset.view = next;
   if (next === view) return;
+  const prev = view;
   view = next;
   $('cams').hidden = next !== 'cameras';
+  $('dev').hidden = next !== 'devdash';
   for (const a of $('views').querySelectorAll('[data-view]')) {
     if (a.dataset.view === next) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   }
-  document.title = next === 'cameras' ? 'Cameras · Portal' : 'Portal';
+  document.title = VIEWS[next] ? `${VIEWS[next]} · Portal` : 'Portal';
+  if (prev === 'cameras') hideCameras();
+  if (prev === 'devdash') hideDevdash();
   if (next === 'cameras') showCameras();
-  else { hideCameras(); renderAll(); }
+  else if (next === 'devdash') showDevdash();
+  else renderAll();
 }
 window.addEventListener('hashchange', () => setView(viewFromHash()));
 initCameras({ api, esc, toast });
+initDevdash({ api, esc });
 
 /* ================= boot ================= */
 function renderAll() {

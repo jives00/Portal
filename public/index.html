@@ -28,6 +28,7 @@
     <nav class="views" id="views" aria-label="Pages">
       <a href="#" data-view="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
       <a href="#cameras" data-view="cameras"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg><span>Cameras</span></a>
+      <a href="#devdash" data-view="devdash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>DevDash</span></a>
     </nav>
     <div class="photo-ctl">
       <button class="iconbtn" id="nextPhoto" title="Next photo  (Space)" aria-label="Next photo">
@@ -77,6 +78,16 @@
     </section>
   </section>
 
+  <section class="dev" id="dev" hidden aria-label="DevDash">
+    <div class="cam-bar">
+      <span class="cam-status" id="devMeta"></span>
+      <span class="sp"></span>
+      <a class="btn" href="http://synology:3005" target="_blank" rel="noopener">Open DevDash</a>
+      <button class="btn" id="devRefresh" title="Refresh  (R)">Refresh</button>
+    </div>
+    <div id="devBody"></div>
+  </section>
+
   <footer class="foot">
     <span><span id="offline" class="pill" hidden>Can't reach Portal's server · showing saved data</span></span>
     <span class="hint"><kbd>?</kbd> shortcuts</span>
@@ -109,6 +120,8 @@
       <dt><kbd>Space</kbd></dt><dd style="margin:0">Play / pause</dd>
       <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd style="margin:0">Previous / next day</dd>
       <dt><kbd>L</kbd> <kbd>Y</kbd></dt><dd style="margin:0">Live view / Yesterday</dd>
+      <dt style="grid-column:1/-1;text-align:left;margin-top:6px;color:var(--ink-3)">On DevDash</dt>
+      <dt><kbd>R</kbd></dt><dd style="margin:0">Refresh</dd>
     </dl>
   </div>
 </div>

@@ -1,7 +1,7 @@
 # Portal
 
 A personal browser home page and security-camera viewer, served from the Synology NAS at
-`http://synology:3012`. It has two tabs.
+`http://synology:3012`. It has three tabs.
 
 **Home**
 - a fresh Unsplash photo on every load, chosen from your keywords
@@ -24,6 +24,11 @@ A personal browser home page and security-camera viewer, served from the Synolog
 - One timeline lane per camera. Drag to scrub stills, play them as a timelapse, or click an event.
   Every player has 1×/2×/4×. Keys: ←/→ (Shift for more), Space, `[`/`]` for days, `L` live, `Y`
   Yesterday, Esc back to the timeline.
+
+**DevDash** (`#devdash`)
+- DevDash's cards: each app's containers, health, errors and recent logs, plus the infrastructure
+  and the MySQL backup. They're read from the DevDash app (port 3005, `DEVDASH_URL`), which must
+  stay running. "Logs" opens DevDash's live log viewer.
 - Retention is set in settings → Cameras: Ring snapshots 30 days and clips 90; Reolink clips and
   stills 90; summaries 14. It deletes files on the NAS only, never the camera's own storage.
 
@@ -48,7 +53,8 @@ shortcuts.
 
 ```
 pnpm install
-pnpm dev        # PORT, DATA_DIR, CAMERA_ROOT, FOOTAGE_ROOT, MQTT_URL, RTSP_BASE, UNSPLASH_ACCESS_KEY
+pnpm dev        # PORT, DATA_DIR, CAMERA_ROOT, FOOTAGE_ROOT, MQTT_URL, RTSP_BASE, UNSPLASH_ACCESS_KEY,
+                # DEVDASH_URL (http://synology:3005 off the NAS)
 pnpm test
 ```
 
