@@ -309,8 +309,6 @@ a.game:hover, a.quote:hover { background: rgba(255,255,255,.05); }
 
 body:is([data-view="cameras"], [data-view="devdash"]) :is(.hero, .dock, .cards, .foot, .photo-ctl) { display: none !important; }
 body:is([data-view="cameras"], [data-view="devdash"]) .topbar #openSettings { opacity: 1; }
-/* Footage and status read better without a busy photo behind them: keep the photo's color, lose its detail. */
-body:is([data-view="cameras"], [data-view="devdash"]) .bg .photo { filter: blur(34px) brightness(.3) saturate(.8); transform: scale(1.1); }
 .bg .photo { transition: opacity .2s ease, filter .4s ease; }
 
 /* ---------- cameras ---------- */

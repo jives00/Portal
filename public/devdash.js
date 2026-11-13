@@ -107,9 +107,15 @@ function render() {
   meta.textContent = D.error ? `Can't reach DevDash${D.at ? ` · as of ${ago(D.at)}` : ''}` : D.at ? `Updated ${ago(D.at)}` : 'Loading…';
 
   const d = D.data;
+  // The Discord bots (AlpacaBot, BSNSFWBot) get their own section; DevDash's registry has no type field.
+  const isBot = (p) => /bot$/i.test(p.name);
+  const apps = d ? d.projects.filter((p) => !isBot(p)) : [];
+  const bots = d ? d.projects.filter(isBot) : [];
   const html = !d ? '<div class="empty">Loading…</div>' : `
     <h3 class="dd-h">Applications</h3>
-    <div class="dd-grid">${d.projects.map(projectCard).join('')}</div>
+    <div class="dd-grid">${apps.map(projectCard).join('')}</div>
+    ${bots.length ? `<h3 class="dd-h">Bots</h3>
+    <div class="dd-grid">${bots.map(projectCard).join('')}</div>` : ''}
     <h3 class="dd-h">Infrastructure</h3>
     <div class="dd-grid dd-infra">${d.infrastructure.map(infraRow).join('')}</div>
     <h3 class="dd-h">Backups</h3>
