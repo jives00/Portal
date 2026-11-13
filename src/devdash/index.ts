@@ -124,7 +124,8 @@ export function devdash(app: FastifyInstance, opts: DevdashOptions) {
           Promise.all(
             s.oneShot.map(async (o) => {
               const i = await inspect(o.container);
-              return { ...o, exitCode: i?.State.ExitCode ?? null, finishedAt: i && hasRun(i.State.FinishedAt) ? i.State.FinishedAt : null };
+              // found: false when no container has that name (e.g. a task run with `docker run --rm`).
+              return { ...o, found: !!i, exitCode: i?.State.ExitCode ?? null, finishedAt: i && hasRun(i.State.FinishedAt) ? i.State.FinishedAt : null };
             }),
           ),
           s.healthUrl ? health(s.healthUrl) : Promise.resolve(null),

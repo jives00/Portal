@@ -62,7 +62,6 @@ function serviceCard(s) {
 
   return `<article class="card dd-card${overall === 'stopped' || overall === 'restarting' ? ' bad' : ''}">
     <div class="dd-head">
-      ${badge(overall)}
       <h2>${e(s.name)}</h2>
       ${errors ? `<span class="dd-errs">${errors} error${errors === 1 ? '' : 's'}</span>` : ''}
       <span class="sp"></span>
@@ -84,6 +83,7 @@ function serviceCard(s) {
     </li>`).join('')}</ul>
     ${(s.oneShot || []).map((o) => `<div class="dd-oneshot"><span>${e(o.name)}:</span>${o.finishedAt
       ? `<span class="${o.exitCode === 0 ? 'ok' : 'down'}">${o.exitCode === 0 ? 'OK' : `exit ${e(o.exitCode)}`}</span><span class="dim">${ago(o.finishedAt)}</span>${logsBtn(o.container)}`
+      : o.found === false ? `<span class="warn">no container named <code>${e(o.container)}</code></span>`
       : '<span class="dim">never run</span>'}</div>`).join('')}
     ${lastError ? `<pre class="dd-lasterr">${e(lastError)}</pre>` : ''}
     <div class="dd-foot">
