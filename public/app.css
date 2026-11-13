@@ -60,7 +60,10 @@ button { cursor: pointer; }
   padding-block: 18px 14px;
   gap: 14px;
 }
-.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: absolute; z-index: 2; top: 18px; right: var(--gutter); }
+/* Pages + gear on the first row, so the switcher sits in the same spot on every page; Home's photo controls go on the row below. */
+.topbar { display: grid; grid-template-columns: auto auto; align-items: center; gap: 6px 12px; position: absolute; z-index: 2; top: 18px; right: var(--gutter); }
+.topbar #openSettings { opacity: .7; transition: opacity .2s, background .15s, color .15s, border-color .15s; }
+.topbar #openSettings:hover, .topbar #openSettings:focus-visible { opacity: 1; }
 .iconbtn {
   width: 36px; height: 36px; display: grid; place-items: center;
   border-radius: 10px; border: 1px solid transparent; background: transparent;
@@ -69,8 +72,7 @@ button { cursor: pointer; }
 .iconbtn:hover { background: var(--glass); border-color: var(--line); color: var(--ink); }
 .iconbtn svg { width: 18px; height: 18px; }
 .iconbtn.on { color: var(--accent); }
-.photo-ctl { display: flex; align-items: center; gap: 4px; margin-left: auto; opacity: .7; transition: opacity .2s; }
-.photo-ctl .sep { width: 1px; height: 18px; background: var(--line); margin-inline: 4px; }
+.photo-ctl { grid-column: 1; grid-row: 2; justify-self: end; display: flex; align-items: center; gap: 4px; opacity: .7; transition: opacity .2s; }
 .photo-ctl:hover, .photo-ctl:focus-within { opacity: 1; }
 
 .hero { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; padding-block: 0 2vh; min-height: 200px; }
@@ -277,7 +279,8 @@ button { cursor: pointer; }
 @media (max-width: 700px) {
   .cards { grid-template-columns: minmax(0, 1fr); }
   .scroll { flex: none; min-height: 0; max-height: 60vh; }
-  .topbar { position: static; }
+  .topbar { position: static; display: flex; justify-content: flex-end; gap: 4px; }
+  .photo-ctl { order: -1; }
   .hero { min-height: 34vh; }
   .hint { display: none; }
 }
@@ -304,8 +307,8 @@ a.game:hover, a.quote:hover { background: rgba(255,255,255,.05); }
 .views a:hover { color: var(--ink); background: rgba(255,255,255,.08); }
 .views a[aria-current="page"] { color: var(--ink); background: rgba(255,255,255,.16); }
 
-body:is([data-view="cameras"], [data-view="devdash"]) :is(.hero, .dock, .cards, .foot, #nextPhoto, #favPhoto, #banPhoto, .photo-ctl .sep) { display: none !important; }
-body:is([data-view="cameras"], [data-view="devdash"]) .photo-ctl { opacity: 1; }
+body:is([data-view="cameras"], [data-view="devdash"]) :is(.hero, .dock, .cards, .foot, .photo-ctl) { display: none !important; }
+body:is([data-view="cameras"], [data-view="devdash"]) .topbar #openSettings { opacity: 1; }
 /* Footage and status read better without a busy photo behind them: keep the photo's color, lose its detail. */
 body:is([data-view="cameras"], [data-view="devdash"]) .bg .photo { filter: blur(34px) brightness(.3) saturate(.8); transform: scale(1.1); }
 .bg .photo { transition: opacity .2s ease, filter .4s ease; }
