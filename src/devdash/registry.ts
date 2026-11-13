@@ -57,14 +57,8 @@ export const DEFAULTS: Registry = {
   services: [
     svc({ name: 'Quest', kind: 'app', containers: ['quest-web', 'quest-api'], healthUrl: 'http://quest-api:3007/health', webUrl: 'http://synology:3006' }),
     svc({ name: 'Trakt', kind: 'app', containers: ['trakt-web', 'trakt-api'], healthUrl: 'http://trakt-api:3002/health', webUrl: 'http://synology:3001/trakt' }),
-    svc({
-      name: 'Pulse',
-      kind: 'app',
-      containers: ['pulse-server', 'pulse-web'],
-      healthUrl: 'http://pulse-server:3000/api/health',
-      webUrl: 'http://synology:3004/pulse/',
-      oneShot: [{ name: 'Weight Sync', container: 'pulse-scripts' }],
-    }),
+    // Pulse's weight sync is a cron inside pulse-server, so it has no one-shot container.
+    svc({ name: 'Pulse', kind: 'app', containers: ['pulse-server', 'pulse-web'], healthUrl: 'http://pulse-server:3000/api/health', webUrl: 'http://synology:3004/pulse/' }),
     svc({ name: 'Travel', kind: 'app', containers: ['travel-web', 'travel-api'], healthUrl: 'http://travel-api:3008/health', webUrl: 'http://synology:3003/travel' }),
     svc({ name: 'Vault', kind: 'app', containers: ['vault-web', 'vault-api'], healthUrl: 'http://vault-api:3009/health', webUrl: 'http://synology:3010/vault' }),
     svc({ name: 'Scout', kind: 'app', containers: ['scout-web', 'scout-api'], healthUrl: 'http://scout-api:3016/health', webUrl: 'http://synology:3015' }),

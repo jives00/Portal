@@ -76,7 +76,7 @@ describe('RegistryStore', () => {
     const bots = store.get().services.filter((s) => s.kind === 'bot').map((s) => s.name);
     expect(bots).toEqual(['AlpacaBot', 'BSNSFWBot']);
     expect(store.get().services.length).toBe(DEFAULTS.services.length);
-    expect(store.containers().has('pulse-scripts')).toBe(true);
+    expect(store.containers().has('pulse-server')).toBe(true);
   });
 
   it('adds, edits, renames and removes, and persists', () => {
