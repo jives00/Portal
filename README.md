@@ -26,9 +26,13 @@ A personal browser home page and security-camera viewer, served from the Synolog
   Yesterday, Esc back to the timeline.
 
 **DevDash** (`#devdash`)
-- DevDash's cards: each app's containers, health, errors and recent logs, plus the infrastructure
-  and the MySQL backup. They're read from the DevDash app (port 3005, `DEVDASH_URL`), which must
-  stay running. "Logs" opens DevDash's live log viewer.
+- Applications, Bots and Infrastructure: each one's containers, health, errors and recent logs,
+  plus the nightly MySQL backup. Portal reads Docker itself through the mounted socket (read-only
+  calls), so the old standalone DevDash app isn't needed. "Logs" opens a live log viewer.
+- **Add**, **Edit** and **Remove** change what's tracked (saved in `data/devdash.json`; the API is
+  `POST /api/devdash/services`, `PUT`/`DELETE /api/devdash/services/:name`).
+
+**Cameras retention**
 - Retention is set in settings → Cameras: Ring snapshots 30 days and clips 90; Reolink clips and
   stills 90; summaries 14. It deletes files on the NAS only, never the camera's own storage.
 
@@ -54,7 +58,7 @@ shortcuts.
 ```
 pnpm install
 pnpm dev        # PORT, DATA_DIR, CAMERA_ROOT, FOOTAGE_ROOT, MQTT_URL, RTSP_BASE, UNSPLASH_ACCESS_KEY,
-                # DEVDASH_URL (http://synology:3005 off the NAS)
+                # DOCKER_SOCKET, BACKUP_STATUS_FILE (the DevDash tab; without a socket it shows "Can't read Docker")
 pnpm test
 ```
 

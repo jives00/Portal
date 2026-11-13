@@ -81,10 +81,12 @@
     <div class="cam-bar">
       <span class="cam-status" id="devMeta"></span>
       <span class="sp"></span>
-      <a class="btn" href="http://synology:3005" target="_blank" rel="noopener">Open DevDash</a>
+      <button class="btn" id="devAdd" title="Track another container  (N)">Add</button>
       <button class="btn" id="devRefresh" title="Refresh  (R)">Refresh</button>
     </div>
+    <div id="devForm" hidden></div>
     <div id="devBody"></div>
+    <div class="dd-logview panel" id="devLogs" hidden aria-label="Container logs"></div>
   </section>
 
   <footer class="foot">
@@ -121,6 +123,7 @@
       <dt><kbd>L</kbd> <kbd>Y</kbd></dt><dd style="margin:0">Live view / Yesterday</dd>
       <dt style="grid-column:1/-1;text-align:left;margin-top:6px;color:var(--ink-3)">On DevDash</dt>
       <dt><kbd>R</kbd></dt><dd style="margin:0">Refresh</dd>
+      <dt><kbd>N</kbd></dt><dd style="margin:0">Track something new</dd>
     </dl>
   </div>
 </div>

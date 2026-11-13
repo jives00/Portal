@@ -10,6 +10,11 @@ export class TtlCache<T> {
 
   constructor(private ttlMs: number) {}
 
+  /** Forget everything, so the next get reloads (an in-flight load still lands). */
+  clear(): void {
+    this.entries.clear();
+  }
+
   async get(key: string, load: () => Promise<T>, ttlMs = this.ttlMs): Promise<T> {
     const hit = this.entries.get(key);
     if (hit && Date.now() - hit.at < ttlMs) return hit.value;

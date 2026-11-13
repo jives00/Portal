@@ -742,6 +742,7 @@ document.addEventListener('keydown', (e) => {
     if (!$('keys').hidden) { $('keys').hidden = true; return; }
     if ($('drawer').classList.contains('open')) return closeSettings();
     if (view === 'cameras') { cameraKey(e); return; }
+    if (view === 'devdash' && devdashKey(e)) return;
     if (filterText) { filterText = ''; renderDock(); }
     return;
   }
@@ -797,7 +798,7 @@ function setView(next) {
 }
 window.addEventListener('hashchange', () => setView(viewFromHash()));
 initCameras({ api, esc, toast });
-initDevdash({ api, esc });
+initDevdash({ api, esc, toast });
 
 /* ================= boot ================= */
 function renderAll() {

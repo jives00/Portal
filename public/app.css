@@ -432,8 +432,32 @@ body:is([data-view="cameras"], [data-view="devdash"]) .topbar #openSettings { op
 .dd-badge.warn { color: #ffd98a; background: rgba(240,180,41,.13); border-color: rgba(240,180,41,.32); }
 .dd-badge.warn i { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
 .dd-errs { flex: none; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; color: #ffb4ab; background: rgba(255,75,75,.16); border: 1px solid rgba(255,75,75,.3); }
-.dd-link { flex: none; font-size: 12.5px; color: var(--ink-2); text-decoration: none; }
+.dd-link { flex: none; font-size: 12.5px; color: var(--ink-2); text-decoration: none; background: none; border: 0; padding: 0; }
 .dd-link:hover { color: var(--ink); text-decoration: underline; }
+.dd-link.danger { color: #ffb4ab; font-weight: 600; }
+.dd-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.dd-foot .dd-link, .dd-row [data-edit], .dd-row [data-ask] { color: var(--ink-3); }
+.dd-confirm { display: inline-flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-2); }
+.dd-warn { color: #ffb4ab; }
+/* add / edit */
+.dd-form { animation: none; max-width: 720px; }
+.dd-fields { display: grid; grid-template-columns: 2fr 1fr; gap: 10px 12px; }
+.dd-fields label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--ink-3); }
+.dd-fields label.wide { grid-column: 1 / -1; }
+.dd-fields .field { flex: none; color-scheme: dark; }
+.dd-formbtns { display: flex; gap: 8px; }
+/* live log viewer */
+.dd-logview { position: fixed; z-index: 30; inset: 70px var(--gutter) 24px; border-radius: var(--r-card); display: flex; flex-direction: column; min-height: 0; }
+.dd-lv-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.dd-lv-bar code { font: 600 13px/1 ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+.dd-lv-bar .field { flex: 0 1 200px; }
+.dd-lv-bar .dim { color: var(--ink-3); font-size: 12.5px; }
+.dd-lv-bar .sp { flex: 1; }
+.dd-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--live); }
+.dd-dot.on { background: var(--ok); animation: pulse 1.2s ease-in-out infinite; }
+.dd-lv-out { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 12px; background: rgba(0,0,0,.55); border-radius: 0 0 var(--r-card) var(--r-card);
+  font: 12.5px/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: pre-wrap; word-break: break-all; color: var(--ink-2); }
+.dd-lv-out .err { color: #ffb4ab; }
 .dd-health { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; }
 .dd-health.ok b { color: var(--ok); font-weight: 600; }
 .dd-health.down b { color: #ffb4ab; font-weight: 600; }
@@ -454,4 +478,8 @@ body:is([data-view="cameras"], [data-view="devdash"]) .topbar #openSettings { op
 .dd-toggle:hover { color: var(--ink); }
 .dd-last { font: 12px/1.4 ui-monospace, 'Cascadia Mono', Consolas, monospace; color: var(--ink-3); word-break: break-all; }
 @media (max-width: 1100px) { .dd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 700px) { .dd-grid { grid-template-columns: minmax(0, 1fr); } .dev { margin-top: 0; } }
+@media (max-width: 700px) {
+  .dd-grid { grid-template-columns: minmax(0, 1fr); } .dev { margin-top: 0; }
+  .dd-fields { grid-template-columns: minmax(0, 1fr); }
+  .dd-logview { inset: 8px 8px calc(64px + env(safe-area-inset-bottom)); }
+}

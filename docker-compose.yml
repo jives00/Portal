@@ -19,6 +19,14 @@ services:
       # and daily summaries. Nothing is ever added to the share's top-level YYYY/MM/DD folders,
       # because the DSM daily-summary task concatenates every .mp4 it finds there.
       - /volume2/SecurityCameras:/cameras
+      # The DevDash tab: container status and logs (Portal only reads), and the nightly MySQL
+      # backup's backup_status.json.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /volume2/docker/shared/backups:/backups:ro
+    networks:
+      - default
+      # So the DevDash tab's health checks reach other apps by container name (quest-api:3007, …).
+      - shared-db
     depends_on:
       - mosquitto
       - ring-mqtt
@@ -50,3 +58,7 @@ services:
     volumes:
       - /volume2/docker/portal/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     restart: unless-stopped
+
+networks:
+  shared-db:
+    external: true
