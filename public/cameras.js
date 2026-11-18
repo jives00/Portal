@@ -1,11 +1,11 @@
-/* Cameras tab. The cameras sit side by side, each with its own stage and timeline. One stage
- * shows that camera's stills (scrub or timelapse), an event clip, Ring live view, or yesterday's
- * daily summary. A timelapse that reaches an event plays its clip, then carries on. One event list
+/* Cameras tab. The cameras (Reolinks) sit side by side, each with its own stage and timeline. One
+ * stage shows that camera's stills (scrub or timelapse), an event clip, live view, or a day's
+ * summary. A timelapse that reaches an event plays its clip, then carries on. One event list
  * below covers every camera showing.
  *
- * Ring stills are its 30 s interval snapshots; Reolink stills are the one JPG it uploads per
- * event. Reolink clips are 4K HEVC and play as uploaded, so a browser without HEVC gets a notice
- * pointing at Yesterday (H.264) instead. */
+ * Stills are the one JPG a camera uploads per event. Clips play as uploaded; the Driveway's are
+ * 4K HEVC (`hevc` on the event), so a browser without HEVC gets a notice pointing at the daily
+ * summary (H.264) instead. */
 
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, '0');
@@ -45,11 +45,9 @@ const C = {
   ready: false,
   visible: false,
   cams: [],
-  mqtt: true,
-  summary: null,
   date: isoDay(new Date()),
   yest: false,   // the Yesterday button is on
-  days: {},      // slug → { snapshots, events } for C.date
+  days: {},      // slug → { snapshots, events, summary } for C.date
   dayLists: {},  // slug → every day with footage
   panels: [],    // one per camera showing, in order
   panelKey: '',
@@ -64,11 +62,10 @@ const stills = (p) => C.days[p.slug]?.snapshots || [];
 const esc = (s) => ctx.esc(s);
 const camName = (p) => camBy(p.slug)?.name ?? '';
 
-/** The daily summary is every Reolink upload concatenated, so it belongs to the (first) Reolink. */
+/** This camera's summary of the day showing (its clips back to back), once Portal has built it. */
 function summaryFor(p) {
-  const s = C.summary;
-  if (!s?.video || s.date !== C.date) return null;
-  return C.cams.find((c) => c.kind === 'reolink')?.slug === p.slug ? s : null;
+  const s = C.days[p.slug]?.summary;
+  return s?.video && s.date === C.date ? s : null;
 }
 
 /* ================= panels ================= */
@@ -83,7 +80,6 @@ const panelHtml = (c) => `<div class="cam-panel" data-slug="${esc(c.slug)}">
     <video controls playsinline controlslist="noplaybackrate" disablepictureinpicture hidden></video>
     <div class="cam-empty" hidden></div>
     <div class="cam-over"><span class="cam-when tnum"></span></div>
-    <div class="live-note" hidden>Ring pauses motion events while live view is open, so nothing records until you close it.</div>
   </div>
   <div class="cam-ctl">
     <button class="iconbtn" data-act="play" aria-label="Play" title="Play / pause  (Space)"></button>
@@ -108,7 +104,7 @@ function renderPanels() {
   for (const p of C.panels) resetStage(p);
   const box = $('camPanels');
   if (!list.length) {
-    box.innerHTML = '<div class="cam-none">No cameras yet. Ring cameras appear once ring-mqtt reports them; Reolink cameras once they upload.</div>';
+    box.innerHTML = '<div class="cam-none">No cameras yet. A camera appears once it uploads to its folder on the SecurityCameras share.</div>';
     C.panels = [];
     C.focus = null;
     return;
@@ -119,7 +115,7 @@ function renderPanels() {
     const p = {
       slug: el.dataset.slug, el,
       frame: q('.cam-frame'), video: q('video'), empty: q('.cam-empty'), when: q('.cam-when'),
-      liveNote: q('.live-note'), play: q('[data-act="play"]'),
+      play: q('[data-act="play"]'),
       rate: q('.seg'), rateLabel: q('.cam-rate-label'), liveBtn: q('[data-act="live"]'),
       lane: q('.lane'), cursor: q('.cursor'),
       mode: 'frame', // frame | clip | live | summary | notice
@@ -173,7 +169,6 @@ function resetStage(p) {
   p.lapse = null;
   p.frame.hidden = true;
   p.empty.hidden = true;
-  p.liveNote.hidden = true;
 }
 
 function showFrame(p, pos) {
@@ -242,7 +237,7 @@ const isShare = (file) => file.startsWith('share/');
 /** `lapse`: the clip came up in a timelapse, which picks up again after it ends. */
 function playClip(p, ev, force = false, lapse = false) {
   resetStage(p);
-  if (isShare(ev.file) && !hevcOk && !force) return hevcNotice(p, ev);
+  if (ev.hevc && !hevcOk && !force) return hevcNotice(p, ev);
   p.mode = 'clip';
   p.clip = ev;
   p.lapse = lapse ? ev.t + ev.duration : null;
@@ -254,7 +249,7 @@ function playClip(p, ev, force = false, lapse = false) {
   renderControls(p);
 }
 
-const playable = (e) => hevcOk || !isShare(e.file);
+const playable = (e) => hevcOk || !e.hevc;
 
 /** This camera's next event after `cur`, skipping clips this browser can't play. */
 function nextClip(p, cur) {
@@ -268,8 +263,8 @@ function nextClip(p, cur) {
 }
 
 function hevcNotice(p, ev) {
-  showNotice(p, `<p>This browser can't play the Reolink's 4K HEVC clips.<br><small>Edge, Safari, and Chrome with hardware video decoding can.</small></p>
-    <p><button class="btn" data-act="force">Try anyway</button> ${C.summary?.video ? '<button class="btn" data-act="yesterday">Watch Yesterday</button>' : ''} <button class="btn" data-act="back">Back to timeline</button></p>`);
+  showNotice(p, `<p>This browser can't play ${esc(camName(p))}'s 4K HEVC clips.<br><small>Edge, Safari, and Chrome with hardware video decoding can. The daily summary plays everywhere.</small></p>
+    <p><button class="btn" data-act="force">Try anyway</button> <button class="btn" data-act="yesterday">${summaryFor(p) ? 'Watch the summary' : 'Watch Yesterday'}</button> <button class="btn" data-act="back">Back to timeline</button></p>`);
   p.clip = ev; // after showNotice, which clears the stage
   p.when.textContent = `${camName(p)} · ${fmtClock(ev.t)}`;
   setCursor(p, ev.t);
@@ -353,7 +348,7 @@ function leaveYesterday() {
   renderBar();
 }
 
-/* ================= live view (Ring) ================= */
+/* ================= live view (cameras with an RTSP URL) ================= */
 
 let hlsLoading = null;
 function loadHls() {
@@ -378,9 +373,8 @@ async function startLive(p) {
   p.mode = 'live';
   const live = (p.live = { hls: null, timer: null });
   p.empty.hidden = false;
-  p.empty.textContent = 'Starting live view… (Ring takes a few seconds)';
+  p.empty.textContent = 'Starting live view…';
   p.when.textContent = `${cam.name} · Live`;
-  p.liveNote.hidden = false;
   setCursor(p, null);
   renderControls(p);
   renderTimeline(p);
@@ -429,7 +423,6 @@ function stopLive(p) {
   v.removeAttribute('src');
   v.load();
   v.hidden = true;
-  p.liveNote.hidden = true;
   fetch(`api/cameras/${p.slug}/live`, { method: 'DELETE', keepalive: true }).catch(() => {});
   if (p.mode === 'live') p.mode = 'frame';
 }
@@ -570,29 +563,18 @@ function eventsShown() {
     .sort((a, b) => b.t - a.t);
 }
 
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-const KINDS = { ding: 'Doorbell', motion: 'Motion', continuous: 'Continuous' };
-
-/** People who came to the door across the Ring cameras showing, counted on the NAS after each clip. */
-function peopleLabel() {
-  const counted = shown().map((c) => C.days[c.slug]?.people).filter(Boolean);
-  if (!counted.length) return '';
-  const total = counted.reduce((n, p) => n + (p.total ?? 0), 0);
-  const pending = counted.some((p) => p.pending);
-  if (!total && pending) return ' · counting people…';
-  return ` · ${plural(total, 'person', 'people')}${pending ? ' so far' : ''}`;
-}
+const KINDS = { motion: 'Motion' };
 
 function renderEvents() {
   const evs = eventsShown();
   const playing = new Set(C.panels.map((p) => p.clip?.file).filter(Boolean));
-  $('camCount').textContent = evs.length ? `${evs.length} on ${dayLabel(C.date)}${peopleLabel()}` : '';
+  $('camCount').textContent = evs.length ? `${evs.length} on ${dayLabel(C.date)}` : '';
   $('camEvents').innerHTML = evs.length
     ? evs.map((e) => {
         const thumb = thumbFor(e);
         return `<li><button class="ev ${e.kind} ${playing.has(e.file) ? 'on' : ''}" data-slug="${esc(e.slug)}" data-i="${e.i}">
           <span class="ev-thumb">${thumb ? `<img src="${esc(thumb)}" alt="" loading="lazy" decoding="async">` : ''}<span class="ev-dur">${fmtDur(e.duration)}</span></span>
-          <span class="ev-meta"><b><i class="ev-dot"></i>${fmtClock(e.t)}</b><small>${esc(camBy(e.slug)?.name ?? '')}${e.kind === 'motion' ? '' : ` · ${KINDS[e.kind] ?? ''}`}${e.people ? ` · ${plural(e.people, 'person', 'people')}` : ''}</small></span></button></li>`;
+          <span class="ev-meta"><b><i class="ev-dot"></i>${fmtClock(e.t)}</b><small>${esc(camBy(e.slug)?.name ?? '')}</small></span></button></li>`;
       }).join('')
     : `<li class="empty">No events on ${dayLabel(C.date)}.</li>`;
 }
@@ -677,20 +659,11 @@ async function refreshStatus() {
   }
   const before = C.cams.map((c) => c.slug).join();
   C.cams = s.cameras;
-  C.mqtt = s.mqtt;
-  C.summary = s.summary;
-  const rec = C.cams.filter((c) => c.recording);
-  const issues = [];
-  if (C.cams.some((c) => c.kind === 'ring') && !s.mqtt) issues.push('Not connected to ring-mqtt');
-  for (const c of C.cams) {
-    if (c.online === false) issues.push(`${c.name} is offline`);
-    if (c.error) issues.push(`${c.name}: ${c.error}`);
-  }
-  if (s.lowDisk) issues.push('Continuous recording paused: under 100 GB free on the share');
-  if (s.summary?.error) issues.push(s.summary.error);
-  $('camStatus').className = `cam-status ${rec.length ? 'rec' : issues.length ? 'bad' : 'ok'}`;
-  $('camStatus').textContent = rec.length ? `Recording ${rec.map((c) => c.name).join(', ')}` : issues.length ? 'Problem' : '';
-  $('camStatus').title = issues.join('\n') || 'All cameras OK';
+  const err = s.summary?.error;
+  const building = s.summary?.building;
+  $('camStatus').className = `cam-status ${err ? 'bad' : 'ok'}`;
+  $('camStatus').textContent = err ? 'Problem' : '';
+  $('camStatus').title = err || (building ? `Building ${camBy(building.slug)?.name ?? building.slug}'s summary for ${dayLabel(building.date)}` : 'All cameras OK');
   const changed = C.cams.map((c) => c.slug).join() !== before;
   if (changed) { renderPicker(); loadDayLists(); }
   C.panels.forEach(renderControls);
@@ -719,13 +692,13 @@ function wireVideo(p) {
   v.addEventListener('volumechange', () => { prefs.muted = v.muted; savePrefs(); });
   // A browser without HEVC may play the audio over a blank picture rather than fail outright.
   v.addEventListener('loadeddata', () => {
-    if (p.mode !== 'clip' || !isShare(p.clip.file) || v.videoWidth) return;
+    if (p.mode !== 'clip' || !p.clip?.hevc || v.videoWidth) return;
     p.lapse != null ? resumeTimelapse(p) : hevcNotice(p, p.clip);
   });
   v.addEventListener('error', () => {
     if (p.mode !== 'clip' || !p.clip || !v.getAttribute('src')) return;
     if (p.lapse != null) return resumeTimelapse(p);
-    if (isShare(p.clip.file)) hevcNotice(p, p.clip);
+    if (p.clip.hevc) hevcNotice(p, p.clip);
     else showNotice(p, `<p>Couldn't play this clip.</p><p><button class="btn" data-act="back">Back to timeline</button></p>`);
   });
 }
@@ -864,32 +837,25 @@ export async function cameraSettings(P) {
   }
   if (!P.isConnected) return;
   const u = s.usage;
-  const used = (slug) => (u?.cameras[slug] ? ` · ${fmtBytes(u.cameras[slug].clips)} clips, ${fmtBytes(u.cameras[slug].snapshots)} stills` : '');
-  const ring = Object.entries(s.cameras);
-  const reo = Object.entries(s.reolink.cameras);
+  const used = (slug) => {
+    const c = u?.cameras[slug];
+    return c ? ` · ${fmtBytes(c.clips)} clips, ${fmtBytes(c.snapshots)} stills, ${fmtBytes(c.summaries)} summaries` : '';
+  };
+  const cams = Object.entries(s.cameras);
   P.innerHTML = `<form id="camSet" style="display:flex;flex-direction:column;gap:22px">
-    <section><h3>Ring</h3>
-      <div class="list">${ring.map(([id, c]) => `<div class="li"><input type="checkbox" class="switch" data-ring="${esc(id)}" data-f="enabled" ${c.enabled ? 'checked' : ''} aria-label="Record ${esc(c.name)}">
-        <span class="grow"><input class="field" data-ring="${esc(id)}" data-f="name" value="${esc(c.name)}" maxlength="60" required aria-label="Camera name"><small>${esc(c.slug)}/${used(c.slug)}</small></span></div>`).join('')
-        || '<div class="li"><span class="grow note" style="margin:0">None yet. They appear once ring-mqtt reports them.</span></div>'}</div>
+    <section><h3>Cameras</h3>
+      <div class="list">${cams.map(([prefix, c]) => `<div class="li"><span class="grow">
+        <input class="field" data-cam="${esc(prefix)}" data-f="name" value="${esc(c.name)}" maxlength="60" required aria-label="Camera name">
+        <input class="field" data-cam="${esc(prefix)}" data-f="rtsp" value="${esc(c.rtsp)}" placeholder="rtsp://user:password@camera-ip:554/h264Preview_01_main" spellcheck="false" autocomplete="off" aria-label="${esc(c.name)} live view (RTSP URL)" style="margin-top:6px">
+        <small>${esc(c.folder || 'top level')}/ · ${esc(prefix)}_… uploads${used(c.slug)}</small></span></div>`).join('')
+        || '<div class="li"><span class="grow note" style="margin:0">None yet. A camera appears once it uploads to its folder on the SecurityCameras share.</span></div>'}</div>
+      <p class="note">The second field is the camera's RTSP address, for live view. Leave it empty for a camera without RTSP (the battery Driveway camera has none). The password stays on the NAS and shows here as ••••.</p></section>
+    <section><h3>Retention</h3>
       <div class="setrows">
-        <label class="row"><span>Keep snapshots</span><span>${num('snapshotDays', s.snapshotDays, 1, 365)} days</span></label>
-        <label class="row"><span>Keep clips</span><span>${num('eventDays', s.eventDays, 1, 730)} days</span></label>
-        <label class="row"><span>Snapshot every</span><span>${num('snapshotInterval', s.snapshotInterval, 10, 600)} sec</span></label>
-        <label class="row"><span>Record per event</span><span>${num('clipLength', s.clipLength, 15, 300)} sec</span></label>
-        <div class="row"><label style="display:flex;align-items:center;gap:10px"><input type="checkbox" class="switch" name="contOn" ${s.continuous.enabled ? 'checked' : ''}>Record continuously</label>
-          <span><input type="time" class="field" name="contStart" value="${esc(s.continuous.start)}" required aria-label="From"> to <input type="time" class="field" name="contEnd" value="${esc(s.continuous.end)}" required aria-label="Until"></span></div>
+        <label class="row"><span>Keep clips and stills</span><span>${num('clipDays', s.clipDays, 2, 730)} days</span></label>
+        <label class="row"><span>Keep daily summaries</span><span>${num('summaryDays', s.summaryDays, 2, 730)} days</span></label>
       </div>
-      <p class="note">Ring takes the snapshots and may not honor very short intervals. A doorbell press extends a clip. Live view pauses Ring's motion events, so nothing records while it's open.</p>
-      <p class="note">Continuous recording keeps the stream open and saves back-to-back 5-minute clips, so arrivals aren't cut off. Ring's motion alerts pause during those hours, it drains a battery doorbell (about 14% an hour), and it pauses if the share drops under 100 GB free. Keep clips covers these too.</p></section>
-    <section><h3>Reolink</h3>
-      <div class="list">${reo.map(([prefix, c]) => `<div class="li"><span class="grow"><input class="field" data-reo="${esc(prefix)}" value="${esc(c.name)}" maxlength="60" required aria-label="Camera name"><small>${esc(prefix)}_… uploads${used(c.slug)}</small></span></div>`).join('')
-        || '<div class="li"><span class="grow note" style="margin:0">None yet. They appear once they upload to the share.</span></div>'}</div>
-      <div class="setrows">
-        <label class="row"><span>Keep clips and stills</span><span>${num('clipDays', s.reolink.clipDays, 2, 730)} days</span></label>
-        <label class="row"><span>Keep daily summaries</span><span>${num('summaryDays', s.reolink.summaryDays, 2, 730)} days${u ? ` · ${fmtBytes(u.summaries)}` : ''}</span></label>
-      </div>
-      <p class="note">Retention only deletes files on the NAS. The camera's own storage is untouched. Two days is the minimum, so the daily summary can always be built from yesterday's clips.</p></section>
+      <p class="note">Retention only deletes files on the NAS. The cameras' own storage is untouched. Portal builds each camera's summary after midnight, from the day's clips.</p></section>
     <div><button class="btn primary" id="camSave">Save</button> <span class="note" id="camUsageAt">${u ? `Disk use measured ${new Date(u.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Measuring disk use…'}</span>
       <p class="err" id="camSetErr" hidden></p></div>
   </form>`;
@@ -899,11 +865,8 @@ export async function cameraSettings(P) {
     const f = e.target;
     const next = structuredClone(s);
     delete next.usage;
-    for (const k of ['snapshotDays', 'eventDays', 'snapshotInterval', 'clipLength']) next[k] = Number(f.elements[k].value);
-    for (const k of ['clipDays', 'summaryDays']) next.reolink[k] = Number(f.elements[k].value);
-    next.continuous = { enabled: f.elements.contOn.checked, start: f.elements.contStart.value, end: f.elements.contEnd.value };
-    for (const el of f.querySelectorAll('[data-ring]')) next.cameras[el.dataset.ring][el.dataset.f] = el.type === 'checkbox' ? el.checked : el.value.trim();
-    for (const el of f.querySelectorAll('[data-reo]')) next.reolink.cameras[el.dataset.reo].name = el.value.trim();
+    for (const k of ['clipDays', 'summaryDays']) next[k] = Number(f.elements[k].value);
+    for (const el of f.querySelectorAll('[data-cam]')) next.cameras[el.dataset.cam][el.dataset.f] = el.value.trim();
     $('camSave').disabled = true;
     try {
       s = await ctx.api('api/cameras/settings', { method: 'PUT', body: JSON.stringify(next) });

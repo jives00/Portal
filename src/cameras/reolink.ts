@@ -1,20 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DayIndex, expired, listDays } from './library';
-import { DAY_RE, dayPath, isoDay } from './paths';
-import { summaryDate } from './summary';
+import { DAY_RE, FOLDER_RE, dayPath, isoDay } from './paths';
 
 /**
- * The Reolink uploads over SFTP into the share's top-level folders, on its own schedule:
- *   YYYY/MM/DD/<Prefix>_<channel>_<YYYYMMDDHHMMSS>.mp4   event clip (4K HEVC, with pre-roll)
- *   YYYY/MM/DD/<Prefix>_<channel>_<YYYYMMDDHHMMSS>.jpg   event still, a few seconds in
- *   YYYY/MM/DD/Daily_Summary_<day>.mp4                    the DSM task's join of the day before
- * Portal reads these as they are. It never adds files to those folders, because the DSM task
- * concatenates every .mp4 it finds there; the only write is retention deleting old ones.
+ * The Reolinks upload over FTP, each into its own folder of the share, on their own schedule:
+ *   <folder>/YYYY/MM/DD/<Prefix>_<channel>_<YYYYMMDDHHMMSS>.mp4   event clip (with pre-roll)
+ *   <folder>/YYYY/MM/DD/<Prefix>_<channel>_<YYYYMMDDHHMMSS>.jpg   event still, a few seconds in
+ * Portal reads these as they are. Its only writes there are retention deleting old ones; the
+ * daily summaries it builds go in `<folder>/Summary/` (see summaries.ts).
+ *
+ * Functions here take a camera's folder (`<share>/<folder>`) as their root. '' (the share's top
+ * level) is the old layout, from before 2026-11-18; it still works.
  */
 
 const FILE_RE = /^(.+?)_(\d{2})_(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\.(mp4|jpg)$/;
-const SUMMARY_RE = /^Daily_Summary_.*\.mp4$/i;
 /** Uploads still in progress are skipped. */
 const SETTLE_MS = 2 * 60_000;
 
@@ -34,7 +34,7 @@ export function parseReolink(name: string): ReolinkFile | null {
   return { prefix, date: `${y}-${mo}-${d}`, t: +h * 3600 + +mi * 60 + +s, ext: ext as 'mp4' | 'jpg' };
 }
 
-const readdir = (dir: string) => {
+export const readdir = (dir: string) => {
   try {
     return fs.readdirSync(dir);
   } catch {
@@ -42,8 +42,15 @@ const readdir = (dir: string) => {
   }
 };
 
-/** The share's own day folders (YYYY/MM/DD at the top level), newest first. */
+/** A folder's own day folders (YYYY/MM/DD directly under it), newest first. */
 export const shareDays = (root: string) => listDays(root, '');
+
+/** Share folders holding a YYYY/MM/DD tree, i.e. a camera's upload folder. */
+export function uploadFolders(root: string, skip: string[] = []): string[] {
+  return readdir(root)
+    .filter((n) => FOLDER_RE.test(n) && !/^\d{4}$/.test(n) && !skip.includes(n) && listDays(root, n).length > 0)
+    .sort();
+}
 
 /** Every filename prefix that appears in the given day folders. */
 export function discoverPrefixes(root: string, days = shareDays(root)): string[] {
@@ -69,12 +76,13 @@ export function reolinkDays(root: string, prefix: string): string[] {
   return [...days].sort().reverse();
 }
 
-export type Probe = (file: string) => Promise<number>;
+export type Probe = (file: string) => Promise<{ duration: number; codec: string }>;
 
 /**
  * One camera's clips and stills for a day. A clip that starts just before midnight can land in
  * the next day's folder, so both folders are read and files are placed by their own timestamp.
- * Clip lengths come from `probe` (ffprobe) and are cached per day under `cacheDir`.
+ * Clip lengths and codecs come from `probe` (ffprobe) and are cached per day under `cacheDir`.
+ * File paths are relative to `root`.
  */
 export async function reolinkDay(
   root: string,
@@ -89,7 +97,7 @@ export async function reolinkDay(
   const folders = [date, isoDay(new Date(y, m - 1, d + 1))];
 
   const cacheFile = path.join(cacheDir, `${prefix}-${date}.json`);
-  let cache: Record<string, { size: number; duration: number }> = {};
+  let cache: Record<string, { size: number; duration: number; codec?: string }> = {};
   try {
     cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
   } catch {
@@ -117,17 +125,19 @@ export async function reolinkDay(
         continue;
       }
       let entry = cache[name];
-      if (!entry || entry.size !== stat.size) {
+      // Entries from before codecs were recorded are probed again.
+      if (!entry || entry.size !== stat.size || entry.codec === undefined) {
         let duration = 0;
+        let codec = '';
         try {
-          duration = await probe(full);
+          ({ duration, codec } = await probe(full));
         } catch {
           /* unreadable clip; shown with a nominal length */
         }
-        entry = cache[name] = { size: stat.size, duration: Math.max(1, Math.round(duration)) };
+        entry = cache[name] = { size: stat.size, duration: Math.max(1, Math.round(duration)), codec };
         dirty = true;
       }
-      index.events.push({ t: f.t, kind: 'motion', duration: entry.duration, file });
+      index.events.push({ t: f.t, kind: 'motion', duration: entry.duration, file, hevc: entry.codec === 'hevc' });
     }
   }
   index.snapshots.sort((a, b) => a.t - b.t);
@@ -141,42 +151,28 @@ export async function reolinkDay(
 }
 
 /**
- * Retention for the share's top-level folders. Deletes only:
- *  - `<prefix>_NN_<timestamp>.mp4|jpg` for the given prefixes, in day folders past `clipDays`;
- *  - `Daily_Summary_*.mp4` whose footage date is past `summaryDays`.
- * Then removes day, month and year folders left empty. Anything else is left alone. Returns the
- * number of files deleted.
+ * Retention for one camera folder. Deletes only `<prefix>_NN_<timestamp>.mp4|jpg` for the given
+ * prefixes, in day folders past `clipDays`, then day, month and year folders left empty. Anything
+ * else is left alone. Returns the number of files deleted.
  */
-export function sweepShare(
-  root: string,
-  prefixes: string[],
-  keep: { clipDays: number; summaryDays: number },
-  now = new Date(),
-): number {
+export function sweepShare(root: string, prefixes: string[], clipDays: number, now = new Date()): number {
   const known = new Set(prefixes);
   const days = shareDays(root);
-  const oldClips = new Set(expired(days, Math.max(2, keep.clipDays), now));
-  // Same cutoff rule as expired(): keeping N days keeps today and the N-1 before it.
-  const summaryBefore = isoDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - Math.max(2, keep.summaryDays) + 1));
+  const old = new Set(expired(days, Math.max(2, clipDays), now));
 
   let removed = 0;
   for (const day of days) {
     const dir = path.join(root, dayPath('', day));
-    const [y, m, d] = day.split('-').map(Number);
-    const folderDay = new Date(y, m - 1, d);
-    for (const name of readdir(dir)) {
-      let drop = false;
-      if (SUMMARY_RE.test(name)) drop = summaryDate(name, folderDay) < summaryBefore;
-      else if (oldClips.has(day)) {
+    if (old.has(day)) {
+      for (const name of readdir(dir)) {
         const f = parseReolink(name);
-        drop = Boolean(f && known.has(f.prefix));
-      }
-      if (!drop) continue;
-      try {
-        fs.rmSync(path.join(dir, name), { force: true });
-        removed++;
-      } catch {
-        /* retried next sweep */
+        if (!f || !known.has(f.prefix)) continue;
+        try {
+          fs.rmSync(path.join(dir, name), { force: true });
+          removed++;
+        } catch {
+          /* retried next sweep */
+        }
       }
     }
     // Walk up DD → MM → YYYY, stopping at the first folder that still has something in it.
@@ -195,66 +191,33 @@ export function sweepShare(
 }
 
 export interface Usage {
-  /** bytes, keyed by camera slug, then 'clips' | 'snapshots' */
-  cameras: Record<string, { clips: number; snapshots: number }>;
-  summaries: number;
+  /** bytes, keyed by camera slug */
+  cameras: Record<string, { clips: number; snapshots: number; summaries: number }>;
   at: number;
 }
 
-/** Bytes in every file under `dir`, read without blocking the event loop. */
-async function walk(dir: string, each: (file: string, name: string, size: number) => void): Promise<void> {
-  let entries: fs.Dirent[];
-  try {
-    entries = await fs.promises.readdir(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const e of entries) {
-    const full = path.join(dir, e.name);
-    if (e.isDirectory()) await walk(full, each);
-    else if (e.isFile()) {
-      try {
-        each(full, e.name, (await fs.promises.stat(full)).size);
-      } catch {
-        /* deleted mid-walk */
-      }
-    }
-  }
-}
-
 /** Disk used per camera and type, for the settings page. Slow on a big tree; run it in the background. */
-export async function measure(
-  shareRoot: string,
-  footageRoot: string,
-  ring: { slug: string }[],
-  reolink: Record<string, { slug: string }>,
-): Promise<Usage> {
-  const usage: Usage = { cameras: {}, summaries: 0, at: 0 };
-  const add = (slug: string, kind: 'clips' | 'snapshots', n: number) => {
-    const u = (usage.cameras[slug] ??= { clips: 0, snapshots: 0 });
-    u[kind] += n;
-  };
-  for (const cam of ring) {
-    await walk(path.join(footageRoot, cam.slug), (file, _name, size) =>
-      add(cam.slug, file.split(path.sep).includes('snapshots') ? 'snapshots' : 'clips', size),
-    );
-  }
-  for (const day of shareDays(shareRoot)) {
-    const dir = path.join(shareRoot, dayPath('', day));
-    for (const name of readdir(dir)) {
-      const isSummary = SUMMARY_RE.test(name);
-      const f = isSummary ? null : parseReolink(name);
-      const cam = f && reolink[f.prefix];
-      if (!isSummary && !cam) continue;
-      let size = 0;
-      try {
-        size = (await fs.promises.stat(path.join(dir, name))).size;
-      } catch {
-        continue;
-      }
-      if (isSummary) usage.summaries += size;
-      else if (cam && f) add(cam.slug, f.ext === 'mp4' ? 'clips' : 'snapshots', size);
+export async function measure(shareRoot: string, cameras: Record<string, { slug: string; folder: string }>): Promise<Usage> {
+  const usage: Usage = { cameras: {}, at: 0 };
+  const size = async (file: string) => {
+    try {
+      return (await fs.promises.stat(file)).size;
+    } catch {
+      return 0;
     }
+  };
+  for (const [prefix, cam] of Object.entries(cameras)) {
+    const u = (usage.cameras[cam.slug] = { clips: 0, snapshots: 0, summaries: 0 });
+    const root = path.join(shareRoot, cam.folder);
+    for (const day of shareDays(root)) {
+      const dir = path.join(root, dayPath('', day));
+      for (const name of readdir(dir)) {
+        const f = parseReolink(name);
+        if (f?.prefix === prefix) u[f.ext === 'mp4' ? 'clips' : 'snapshots'] += await size(path.join(dir, name));
+      }
+    }
+    const sums = path.join(root, 'Summary');
+    for (const name of readdir(sums)) if (name.startsWith(`${prefix}_`)) u.summaries += await size(path.join(sums, name));
   }
   usage.at = Date.now();
   return usage;

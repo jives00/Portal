@@ -24,15 +24,7 @@ const log = {
 
 const settings = new SettingsStore(path.join(DATA_DIR, 'settings.json'), log);
 const photos = new PhotoService(process.env.UNSPLASH_ACCESS_KEY || undefined, log);
-const cams = cameras(app, {
-  shareRoot: CAMERA_ROOT,
-  // Ring footage gets its own subfolder, never the share's top-level YYYY/MM/DD (see reolink.ts).
-  footageRoot: path.resolve(process.env.FOOTAGE_ROOT ?? path.join(CAMERA_ROOT, 'Sentry')),
-  dataDir: DATA_DIR,
-  mqttUrl: process.env.MQTT_URL ?? 'mqtt://localhost:1883',
-  rtspBase: process.env.RTSP_BASE ?? 'rtsp://localhost:8554',
-  log,
-});
+const cams = cameras(app, { shareRoot: CAMERA_ROOT, dataDir: DATA_DIR, log });
 
 if (!photos.configured) app.log.warn('UNSPLASH_ACCESS_KEY is not set; using the built-in photo set');
 
@@ -51,7 +43,7 @@ app.setErrorHandler((err: FastifyError | Error, _req, reply) => {
   return reply.status(status).send({ error: err.message });
 });
 
-app.get('/health', async () => ({ ok: true, mqtt: cams.mqtt }));
+app.get('/health', async () => ({ ok: true }));
 
 app.get('/api/settings', async () => settings.get());
 app.put('/api/settings', async (req) => settings.set(req.body));

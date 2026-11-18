@@ -325,8 +325,6 @@ body:is([data-view="cameras"], [data-view="devdash"]) .topbar #openSettings { op
 .cam-status.ok::before { background: var(--ok); }
 .cam-status.bad { color: #ffb4ab; }
 .cam-status.bad::before { background: #ffb4ab; }
-.cam-status.rec { color: var(--live); }
-.cam-status.rec::before { background: var(--live); animation: pulse 1.2s ease-in-out infinite; }
 .cam-bar .btn { background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
 .live-btn { color: var(--live); font-weight: 600; }
 .cam-bar #camYest[aria-pressed="true"] { background: var(--accent); color: #111; border-color: transparent; }
@@ -346,7 +344,6 @@ body:is([data-view="cameras"], [data-view="devdash"]) .topbar #openSettings { op
 .cam-over > * { pointer-events: auto; }
 .cam-when { background: rgba(0,0,0,.6); padding: 4px 9px; border-radius: 6px; font-size: 13px; }
 .cam-when:empty { display: none; }
-.live-note { position: absolute; left: 10px; right: 10px; bottom: 56px; text-align: center; font-size: 12px; color: var(--ink-2); text-shadow: 0 1px 6px #000; pointer-events: none; }
 
 .cam-ctl { display: flex; align-items: center; gap: 10px; }
 .cam-ctl .iconbtn { background: var(--glass); border-color: var(--line); color: var(--ink); }
@@ -367,8 +364,6 @@ body:is([data-view="cameras"], [data-view="devdash"]) .topbar #openSettings { op
 .lane .density i { position: absolute; bottom: 0; height: 5px; background: var(--accent); opacity: .55; }
 .lane .marks { position: absolute; left: 0; right: 0; top: 15px; bottom: 8px; }
 .lane .marks b { position: absolute; top: 0; bottom: 0; min-width: 4px; border-radius: 2px; background: var(--warn); cursor: pointer; }
-.lane .marks b.ding { background: var(--live); }
-.lane .marks b.continuous { background: var(--ink-3); }
 .lane .marks b.on { box-shadow: 0 0 0 2px var(--ink); }
 .timeline .cursor { position: absolute; top: 16px; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); box-shadow: 0 0 6px rgba(0,0,0,.8); pointer-events: none; }
 @container (max-width: 560px) { .timeline .hours span:nth-child(odd) { color: transparent; } }
@@ -386,8 +381,6 @@ body:is([data-view="cameras"], [data-view="devdash"]) .topbar #openSettings { op
 .ev-meta b { font-weight: 600; display: flex; align-items: center; gap: 7px; font-variant-numeric: tabular-nums; }
 .ev-meta small { color: var(--ink-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ev-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); flex: none; }
-.ev.ding .ev-dot { background: var(--live); }
-.ev.continuous .ev-dot { background: var(--ink-3); }
 
 /* camera settings */
 .field.num { flex: none; width: 74px; text-align: right; }

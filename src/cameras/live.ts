@@ -4,15 +4,13 @@ import path from 'node:path';
 
 /**
  * On-demand live view. Browsers can't play RTSP, so while someone is watching, ffmpeg repackages
- * ring-mqtt's stream as a rolling HLS playlist (stream copy, no re-encode) under
+ * the camera's RTSP stream as a rolling HLS playlist (video stream copy, no re-encode) under
  * `<dir>/<slug>/index.m3u8`. The page pings every few seconds; a session nobody has pinged for
- * IDLE_MS is stopped, and none runs past MAX_MS (Ring ends streams around 10 minutes).
- *
- * Ring sends no motion events while the stream is open, so recording pauses during live view.
+ * IDLE_MS is stopped, and none runs past MAX_MS, so a forgotten tab doesn't stream all night.
  */
 
 const IDLE_MS = 30_000;
-export const MAX_MS = 9 * 60_000;
+export const MAX_MS = 30 * 60_000;
 
 interface Session {
   proc: ChildProcess;
@@ -55,7 +53,9 @@ export class LiveView {
       proc.on('error', (err) => this.log.warn(`${slug}: live view couldn't start ffmpeg: ${err.message}`));
       proc.on('close', (code) => {
         if (this.sessions.get(slug)?.proc === proc) {
-          if (code) this.log.warn(`${slug}: live view ended: ${stderr.trim().split('\n').pop() ?? code}`);
+          // ffmpeg can echo the URL, credentials and all.
+          const last = (stderr.trim().split('\n').pop() || String(code)).replace(/\/\/[^/@\s]*@/g, '//***@');
+          if (code) this.log.warn(`${slug}: live view ended: ${last}`);
           this.end(slug);
         }
       });

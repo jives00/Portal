@@ -63,7 +63,7 @@ export const DEFAULTS: Registry = {
     svc({ name: 'Vault', kind: 'app', containers: ['vault-web', 'vault-api'], healthUrl: 'http://vault-api:3009/health', webUrl: 'http://synology:3010/vault' }),
     svc({ name: 'Scout', kind: 'app', containers: ['scout-web', 'scout-api'], healthUrl: 'http://scout-api:3016/health', webUrl: 'http://synology:3015' }),
     // Portal checks itself over loopback.
-    svc({ name: 'Portal', kind: 'app', containers: ['portal', 'portal-ring', 'portal-mqtt'], healthUrl: 'http://127.0.0.1:3012/health', webUrl: 'http://synology:3012' }),
+    svc({ name: 'Portal', kind: 'app', containers: ['portal'], healthUrl: 'http://127.0.0.1:3012/health', webUrl: 'http://synology:3012' }),
     svc({ name: 'Signal', kind: 'app', containers: ['signal'], healthUrl: 'http://signal:3013/health', webUrl: 'http://synology:3013' }),
     svc({ name: 'NodeCast TV', kind: 'app', containers: ['nodecast-tv'], webUrl: 'http://synology:3011' }),
     svc({ name: 'AlpacaBot', kind: 'bot', containers: ['alpacabot'] }),

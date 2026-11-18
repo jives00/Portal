@@ -12,15 +12,15 @@ A personal browser home page and security-camera viewer, served from the Synolog
 - weather: now, the next 12 hours, and 5 days
 
 **Cameras** (`#cameras`)
-- **Ring doorbell**, through [ring-mqtt](https://github.com/tsightler/ring-mqtt) without a
-  Ring Protect subscription. Portal records 60 s from each motion event or doorbell press
-  (changeable), saves Ring's interval snapshots, and offers live view. Ring sends no motion events
-  while live view is open, so nothing records until you close it.
-- **Reolink**, which uploads its own clips and stills to the share over SFTP. Portal reads them
-  where they land. Its 4K HEVC clips play as-is, which works in Edge, Safari, and Chrome with
-  hardware decoding. There's no Reolink live view: battery models without a Home Hub don't offer
-  a stream.
-- **Yesterday**: the DSM task's daily summary, converted to H.264.
+- **Reolink cameras**, which upload their own clips and stills to the SecurityCameras share over
+  FTP, each into a folder named after it (`Driveway/`, `FrontDoor/`). Portal reads them where they
+  land and finds a new camera by itself once it uploads.
+- **Live view** for a camera with RTSP (the Reolink doorbell): add its RTSP address in settings →
+  Cameras. The battery Driveway camera has no stream without a Home Hub.
+- **Daily summaries**: after midnight Portal joins each camera's clips from the day into one
+  1080p H.264 video, saved in that camera's `Summary/` folder. **Yesterday** shows them.
+- The Driveway's 4K HEVC clips play as-is, which works in Edge, Safari, and Chrome with hardware
+  decoding; elsewhere the summary is the fallback. The doorbell's clips are H.264 and play anywhere.
 - One timeline lane per camera. Drag to scrub stills, play them as a timelapse, or click an event.
   Every player has 1×/2×/4×. Keys: ←/→ (Shift for more), Space, `[`/`]` for days, `L` live, `Y`
   Yesterday, Esc back to the timeline.
@@ -33,31 +33,28 @@ A personal browser home page and security-camera viewer, served from the Synolog
   `POST /api/devdash/services`, `PUT`/`DELETE /api/devdash/services/:name`).
 
 **Cameras retention**
-- Retention is set in settings → Cameras: Ring snapshots 30 days and clips 90; Reolink clips and
-  stills 90; summaries 14. It deletes files on the NAS only, never the camera's own storage.
+- Retention is set in settings → Cameras: clips and stills 90 days, summaries 14. It deletes files
+  on the NAS only, never the camera's own storage.
 
 Everything is edited in the page's settings drawer (`,`). Press `?` on the page for keyboard
 shortcuts.
 
 ## Setup on the NAS
 
-1. Create `/volume2/docker/portal/` with `data/`, `mosquitto/` and `ring-mqtt/` inside, plus
-   `/volume2/SecurityCameras/Sentry/` (where Ring footage goes; the name is historical).
-2. Copy `docker-compose.yml` into `/volume2/docker/portal/`, `nas/mosquitto/mosquitto.conf`
-   into `mosquitto/`, and `nas/ring-mqtt/config.json` into `ring-mqtt/`.
+1. Create `/volume2/docker/portal/` with `data/` inside.
+2. Copy `docker-compose.yml` into `/volume2/docker/portal/`.
 3. Create `.env` next to the compose file from `.env.example`. Add a free Unsplash Access Key from
    https://unsplash.com/oauth/applications. Without one, Portal uses a small built-in photo set.
 4. Run `docker compose up -d`. Watchtower picks up new images after that.
-5. Open `http://synology:55123` and sign in to Ring (email, password, 2FA code). ring-mqtt saves
-   a refresh token to `ring-mqtt/ring-state.json` and renews it from then on. That file grants
-   full access to the Ring account. In the Ring app, check that end-to-end encryption is **off**;
-   with it on, ring-mqtt can't stream.
+5. For each camera: in DSM, create `SecurityCameras/<Name>`. In the Reolink app, name the camera
+   `<Name>` (no spaces; it becomes the filename prefix) and point FTP at the NAS (port 21,
+   passive), remote directory `SecurityCameras/<Name>`, dated subfolders on, video and image.
 
 ## Development
 
 ```
 pnpm install
-pnpm dev        # PORT, DATA_DIR, CAMERA_ROOT, FOOTAGE_ROOT, MQTT_URL, RTSP_BASE, UNSPLASH_ACCESS_KEY,
+pnpm dev        # PORT, DATA_DIR, CAMERA_ROOT, UNSPLASH_ACCESS_KEY,
                 # DOCKER_SOCKET, BACKUP_STATUS_FILE (the DevDash tab; without a socket it shows "Can't read Docker")
 pnpm test
 ```

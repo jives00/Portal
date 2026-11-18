@@ -1,78 +1,59 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { SLUG_RE } from './paths';
-
-export const CameraSchema = z.object({
-  /** display name; editable */
-  name: z.string().trim().min(1).max(60),
-  /** folder name under the storage root; fixed once the camera is first seen */
-  slug: z.string().regex(SLUG_RE),
-  /** Ring location id, needed to address its MQTT command topics */
-  location: z.string(),
-  enabled: z.boolean().default(true),
-});
+import { FOLDER_RE, SLUG_RE } from './paths';
 
 /** A Reolink camera, keyed by the filename prefix it uploads under (`Driveway_00_…`). */
-export const ReolinkCameraSchema = z.object({
+export const CameraSchema = z.object({
   name: z.string().trim().min(1).max(60),
   /** id in the viewer and its URLs; fixed once the prefix is first seen */
   slug: z.string().regex(SLUG_RE),
-});
-
-export const ReolinkSchema = z.object({
   /**
-   * Days of Reolink clips and stills to keep on the NAS. Never under 2: the DSM task joins
-   * yesterday's clips into the daily summary the next morning.
+   * Share folder it uploads into ('' = the share's top level, the old layout). Set by discovery,
+   * never from outside: it follows the files if they move.
    */
-  clipDays: z.number().int().min(2).max(730),
-  summaryDays: z.number().int().min(2).max(730),
-  cameras: z.record(ReolinkCameraSchema),
+  folder: z.union([z.literal(''), z.string().regex(FOLDER_RE)]).default(''),
+  /** RTSP URL for live view, credentials included; '' = no live view */
+  rtsp: z.union([z.literal(''), z.string().trim().regex(/^rtsps?:\/\/\S+$/, 'must start with rtsp://')]).default(''),
 });
-
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-/** Whether `now` (local time) falls in a continuous-recording window. */
-export function inWindow(w: { start: string; end: string }, now = new Date()): boolean {
-  const mins = (hhmm: string) => +hhmm.slice(0, 2) * 60 + +hhmm.slice(3);
-  const m = now.getHours() * 60 + now.getMinutes();
-  const [start, end] = [mins(w.start), mins(w.end)];
-  if (start === end) return true;
-  return start < end ? m >= start && m < end : m >= start || m < end;
-}
 
 export const SettingsSchema = z.object({
-  snapshotDays: z.number().int().min(1).max(365),
-  eventDays: z.number().int().min(1).max(730),
-  /** seconds between Ring interval snapshots; Ring may not honor very short values */
-  snapshotInterval: z.number().int().min(10).max(600),
-  /** seconds each clip runs after its latest motion event or ding */
-  clipLength: z.number().int().min(15).max(300),
-  /**
-   * Local hours the Ring stream stays open and records back to back, so nobody's arrival is
-   * missed. Ring pauses motion alerts while the stream is open. `end` before `start` crosses
-   * midnight; equal means all day.
-   */
-  continuous: z.object({ enabled: z.boolean(), start: z.string().regex(HHMM), end: z.string().regex(HHMM) }),
-  /** keyed by Ring device id */
+  /** Days of clips and stills to keep on the NAS. Never under 2, so yesterday's summary can be built. */
+  clipDays: z.number().int().min(2).max(730),
+  /** Days of daily summaries to keep. */
+  summaryDays: z.number().int().min(2).max(730),
   cameras: z.record(CameraSchema),
-  /** cameras that upload into the share's top-level YYYY/MM/DD folders */
-  reolink: ReolinkSchema,
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
 export type Camera = z.infer<typeof CameraSchema>;
-export type ReolinkCamera = z.infer<typeof ReolinkCameraSchema>;
 
-export const DEFAULTS: Settings = {
-  snapshotDays: 30,
-  eventDays: 90,
-  snapshotInterval: 30,
-  clipLength: 60,
-  continuous: { enabled: true, start: '15:00', end: '23:00' },
-  cameras: {},
-  reolink: { clipDays: 90, summaryDays: 14, cameras: {} },
-};
+export const DEFAULTS: Settings = { clipDays: 90, summaryDays: 14, cameras: {} };
+
+/** What the API shows for a password: the settings page round-trips it untouched. */
+const MASK = '••••';
+/** user, password (may itself hold @ or :), then @host[:port] and the path */
+const PASSWORD_RE = /^(rtsps?:\/\/[^:/@\s]*:)(.*)(@[^@/\s]+(?:\/.*)?)$/;
+
+/** The RTSP URL with its password hidden, for the API. */
+export const maskRtsp = (url: string) => url.replace(PASSWORD_RE, (_, a, pw, b) => `${a}${pw ? MASK : ''}${b}`);
+
+/** Settings as the API returns them: passwords masked. */
+export function publicSettings(s: Settings): Settings {
+  return { ...s, cameras: Object.fromEntries(Object.entries(s.cameras).map(([k, c]) => [k, { ...c, rtsp: maskRtsp(c.rtsp) }])) };
+}
+
+/** Portal ≤ Nov 2026 kept Ring settings at the top level and the Reolinks under `reolink`. */
+function migrate(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const r = raw as Record<string, unknown>;
+  const old = r.reolink as Partial<Settings> | undefined;
+  if (!old || typeof old !== 'object') return raw;
+  const out: Record<string, unknown> = { cameras: old.cameras ?? {} };
+  if (old.clipDays !== undefined) out.clipDays = old.clipDays;
+  if (old.summaryDays !== undefined) out.summaryDays = old.summaryDays;
+  return out;
+}
 
 export class SettingsStore {
   private current: Settings;
@@ -85,50 +66,42 @@ export class SettingsStore {
     return this.current;
   }
 
-  /** Replaces the settings. Camera slugs and locations can't be changed from outside. */
+  /**
+   * Replaces the settings. Slugs and folders can't be changed from outside, cameras can't be
+   * added that way, and a masked RTSP password (as the API showed it) keeps the stored one.
+   */
   set(next: unknown): Settings {
     const parsed = SettingsSchema.parse(next);
-    for (const [id, cam] of Object.entries(parsed.cameras)) {
-      const known = this.current.cameras[id];
-      if (!known) delete parsed.cameras[id];
-      else parsed.cameras[id] = { ...cam, slug: known.slug, location: known.location };
-    }
-    for (const [prefix, cam] of Object.entries(parsed.reolink.cameras)) {
-      const known = this.current.reolink.cameras[prefix];
-      if (!known) delete parsed.reolink.cameras[prefix];
-      else parsed.reolink.cameras[prefix] = { ...cam, slug: known.slug };
+    for (const [prefix, cam] of Object.entries(parsed.cameras)) {
+      const known = this.current.cameras[prefix];
+      if (!known) {
+        delete parsed.cameras[prefix];
+        continue;
+      }
+      const rtsp = cam.rtsp && cam.rtsp === maskRtsp(known.rtsp) ? known.rtsp : cam.rtsp;
+      parsed.cameras[prefix] = { ...cam, slug: known.slug, folder: known.folder, rtsp };
     }
     return this.write(parsed);
   }
 
-  /** Records a newly seen Ring camera, picking a slug no other camera uses. */
-  addCamera(id: string, cam: Omit<Camera, 'enabled'>): Camera {
-    const added: Camera = { ...cam, slug: this.freeSlug(cam.slug), enabled: true };
-    this.write({ ...this.current, cameras: { ...this.current.cameras, [id]: added } });
+  /** Records a newly seen filename prefix, and the share folder it was found in. */
+  addCamera(prefix: string, slug: string, folder = ''): Camera {
+    const added: Camera = { name: prefix, slug: this.freeSlug(slug), folder, rtsp: '' };
+    this.write({ ...this.current, cameras: { ...this.current.cameras, [prefix]: added } });
     return added;
   }
 
-  /** Records a newly seen Reolink filename prefix. */
-  addReolink(prefix: string, slug: string): ReolinkCamera {
-    const added: ReolinkCamera = { name: prefix, slug: this.freeSlug(slug) };
-    const reolink = { ...this.current.reolink, cameras: { ...this.current.reolink.cameras, [prefix]: added } };
-    this.write({ ...this.current, reolink });
-    return added;
-  }
-
-  /** Internal updates (a discovered name, say); unlike set(), this may change the slug. */
-  updateCamera(id: string, patch: Partial<Camera>): Camera | null {
-    const cam = this.current.cameras[id];
+  /** A camera's uploads now live in another folder (the move into per-camera folders). */
+  moveCamera(prefix: string, folder: string): Camera | null {
+    const cam = this.current.cameras[prefix];
     if (!cam) return null;
-    const next = { ...cam, ...patch };
-    this.write({ ...this.current, cameras: { ...this.current.cameras, [id]: next } });
+    const next = { ...cam, folder };
+    this.write({ ...this.current, cameras: { ...this.current.cameras, [prefix]: next } });
     return next;
   }
 
-  /** Ring and Reolink slugs share one namespace, since both appear in the same viewer. */
   private freeSlug(base: string): string {
-    const s = this.current;
-    const taken = new Set([...Object.values(s.cameras), ...Object.values(s.reolink.cameras)].map((c) => c.slug));
+    const taken = new Set(Object.values(this.current.cameras).map((c) => c.slug));
     let slug = base;
     for (let n = 2; taken.has(slug); n++) slug = `${base.slice(0, 36)}-${n}`;
     return slug;
@@ -153,8 +126,8 @@ export class SettingsStore {
       }
       return structuredClone(DEFAULTS);
     }
-    // Merge over defaults so a file saved by an older version (Sentry's, say) picks up new fields.
-    const result = SettingsSchema.safeParse({ ...structuredClone(DEFAULTS), ...(raw as object) });
+    // Merge over defaults so a file saved by an older version picks up new fields.
+    const result = SettingsSchema.safeParse({ ...structuredClone(DEFAULTS), ...(migrate(raw) as object) });
     if (result.success) return result.data;
     this.log.warn(`${this.file} failed validation, using defaults: ${result.error.message}`);
     return structuredClone(DEFAULTS);
