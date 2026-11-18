@@ -38,6 +38,22 @@ const PASSWORD_RE = /^(rtsps?:\/\/[^:/@\s]*:)(.*)(@[^@/\s]+(?:\/.*)?)$/;
 /** The RTSP URL with its password hidden, for the API. */
 export const maskRtsp = (url: string) => url.replace(PASSWORD_RE, (_, a, pw, b) => `${a}${pw ? MASK : ''}${b}`);
 
+/**
+ * The RTSP URL as ffmpeg needs it: the password percent-encoded, so one with @ # % ? / : or a
+ * space reaches the camera intact. Already-encoded passwords come out the same.
+ */
+export function rtspForFfmpeg(url: string): string {
+  return url.replace(PASSWORD_RE, (_, a, pw, b) => {
+    let raw = pw;
+    try {
+      raw = decodeURIComponent(pw);
+    } catch {
+      /* a lone % : take it literally */
+    }
+    return `${a}${encodeURIComponent(raw)}${b}`;
+  });
+}
+
 /** Settings as the API returns them: passwords masked. */
 export function publicSettings(s: Settings): Settings {
   return { ...s, cameras: Object.fromEntries(Object.entries(s.cameras).map(([k, c]) => [k, { ...c, rtsp: maskRtsp(c.rtsp) }])) };

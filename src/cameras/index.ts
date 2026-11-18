@@ -6,7 +6,7 @@ import { expired, listDays } from './library';
 import { LiveView } from './live';
 import { DAY_RE, FOLDER_RE, dayPath, slugify } from './paths';
 import { Usage, discoverPrefixes, measure, parseReolink, reolinkDay, reolinkDays, sweepShare, uploadFolders } from './reolink';
-import { Camera, SettingsStore, publicSettings } from './settings';
+import { Camera, SettingsStore, publicSettings, rtspForFfmpeg } from './settings';
 import { SummaryBuilder, SummaryCamera, findSummary, run } from './summaries';
 
 /**
@@ -259,7 +259,7 @@ export function cameras(app: FastifyInstance, opts: Options) {
   app.post<{ Params: { slug: string } }>('/api/cameras/:slug/live', async (req, reply) => {
     const cam = camBySlug(req.params.slug);
     if (!cam?.rtsp) return reply.status(404).send({ error: 'This camera has no live view' });
-    const s = liveView.ping(cam.slug, cam.rtsp);
+    const s = liveView.ping(cam.slug, rtspForFfmpeg(cam.rtsp));
     return { ...s, playlist: `live/${s.playlist}` };
   });
   app.delete<{ Params: { slug: string } }>('/api/cameras/:slug/live', async (req) => {

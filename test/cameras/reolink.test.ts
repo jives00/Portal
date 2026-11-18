@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { discoverPrefixes, measure, parseReolink, reolinkDay, reolinkDays, sweepShare, uploadFolders } from '../../src/cameras/reolink';
-import { SettingsStore, maskRtsp, publicSettings } from '../../src/cameras/settings';
+import { SettingsStore, maskRtsp, publicSettings, rtspForFfmpeg } from '../../src/cameras/settings';
 
 let root: string;
 let cache: string;
@@ -183,5 +183,15 @@ describe('camera settings', () => {
     expect(store.set(shown).cameras.FrontDoor.rtsp).toBe(url);
     expect(maskRtsp('rtsp://192.168.0.50/live')).toBe('rtsp://192.168.0.50/live');
     expect(() => store.set({ ...shown, cameras: { FrontDoor: { ...shown.cameras.FrontDoor, rtsp: 'http://x' } } })).toThrow();
+  });
+});
+
+describe('rtspForFfmpeg', () => {
+  it('percent-encodes the password, and leaves an encoded one alone', () => {
+    const host = '@192.168.0.57:554/h264Preview_01_main';
+    expect(rtspForFfmpeg('rtsp://admin:pa@ss#1 ?%' + host)).toBe('rtsp://admin:pa%40ss%231%20%3F%25' + host);
+    expect(rtspForFfmpeg('rtsp://admin:pa%40ss' + host)).toBe('rtsp://admin:pa%40ss' + host);
+    expect(rtspForFfmpeg('rtsp://admin:plain' + host)).toBe('rtsp://admin:plain' + host);
+    expect(rtspForFfmpeg('rtsp://192.168.0.57/live')).toBe('rtsp://192.168.0.57/live');
   });
 });
