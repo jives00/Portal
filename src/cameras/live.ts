@@ -19,8 +19,21 @@ interface Session {
   timer: NodeJS.Timeout;
 }
 
+/** What the page shows when ffmpeg gives up, from its last error line. */
+export function liveError(line: string): string {
+  if (/401|unauthori[sz]ed/i.test(line)) return 'The camera rejected the login. Check the user name and password in the RTSP address (settings → Cameras).';
+  if (/connection refused|timed out|no route|unreachable/i.test(line)) return "Can't reach the camera. Check its IP address and that RTSP is turned on.";
+  if (/404|not found/i.test(line)) return 'The camera has no stream at that path. Check the end of the RTSP address.';
+  return `The stream stopped: ${line}`;
+}
+
 export class LiveView {
   private sessions = new Map<string, Session>();
+  /**
+   * The last failure per camera. Until the page gives up (DELETE), pings get the error instead of
+   * a new ffmpeg: retrying a bad password every second can lock a camera's logins.
+   */
+  private failed = new Map<string, string>();
 
   constructor(
     readonly dir: string,
@@ -35,9 +48,11 @@ export class LiveView {
   }
 
   /** Starts a session (or keeps one alive). Returns the playlist path under `dir`. */
-  ping(slug: string, rtspUrl: string): { playlist: string; ready: boolean; endsAt: number } {
+  ping(slug: string, rtspUrl: string): { playlist: string; ready: boolean; endsAt: number; error?: string } {
     const out = path.join(this.dir, slug);
     let s = this.sessions.get(slug);
+    const failure = this.failed.get(slug);
+    if (!s && failure) return { playlist: `${slug}/index.m3u8`, ready: false, endsAt: 0, error: failure };
     if (!s) {
       fs.rmSync(out, { recursive: true, force: true });
       fs.mkdirSync(out, { recursive: true });
@@ -55,7 +70,10 @@ export class LiveView {
         if (this.sessions.get(slug)?.proc === proc) {
           // ffmpeg can echo the URL, credentials and all.
           const last = (stderr.trim().split('\n').pop() || String(code)).replace(/\/\/[^/@\s]*@/g, '//***@');
-          if (code) this.log.warn(`${slug}: live view ended: ${last}`);
+          if (code) {
+            this.log.warn(`${slug}: live view ended: ${last}`);
+            this.failed.set(slug, liveError(last));
+          }
           this.end(slug);
         }
       });
@@ -72,7 +90,9 @@ export class LiveView {
     };
   }
 
+  /** The page closed live view (or gave up on it): the next ping tries again. */
   stop(slug: string) {
+    this.failed.delete(slug);
     this.end(slug);
   }
 

@@ -33,3 +33,12 @@ describe('day folders', () => {
     expect(expired(['2026-10-25', '2026-10-24', '2026-10-23', '2026-10-01'], 2, now)).toEqual(['2026-10-23', '2026-10-01']);
   });
 });
+
+describe('liveError', () => {
+  it('turns ffmpeg errors into something to act on', async () => {
+    const { liveError } = await import('../../src/cameras/live');
+    expect(liveError('Error opening input files: Server returned 401 Unauthorized (authorization failed)')).toMatch(/rejected the login/);
+    expect(liveError('Connection to tcp://192.168.0.57:554 failed: Connection refused')).toMatch(/Can't reach/);
+    expect(liveError('Server returned 404 Not Found')).toMatch(/no stream at that path/);
+  });
+});

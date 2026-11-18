@@ -383,10 +383,11 @@ async function startLive(p) {
   const ping = () => ctx.api(url, { method: 'POST' });
   try {
     let s = await ping();
-    for (let i = 0; !s.ready && i < 30 && p.live === live; i++) {
+    for (let i = 0; !s.ready && !s.error && i < 30 && p.live === live; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       s = await ping();
     }
+    if (s.error && p.live === live) throw new Error(s.error);
     if (p.live !== live) return;
     if (!s.ready) throw new Error(`${cam.name}'s stream didn't start.`);
     live.timer = setInterval(() => ping().catch(() => {}), 10_000);
